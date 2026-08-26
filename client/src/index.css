@@ -15,6 +15,7 @@
     background-color: #0b0f19;
     color: #f8fafc;
     font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    min-height: 100vh;
     overflow-x: hidden;
   }
 }
@@ -37,6 +38,18 @@
   box-shadow: 0 12px 40px -10px rgba(59, 130, 246, 0.25);
 }
 
+.glass-card {
+  background: rgba(30, 41, 59, 0.5);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.2s ease-in-out;
+}
+
+.glass-card:hover {
+  border-color: rgba(99, 102, 241, 0.4);
+  transform: translateY(-2px);
+}
+
 .gradient-text {
   background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #f472b6 100%);
   -webkit-background-clip: text;
@@ -57,7 +70,7 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: #0b0f19;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -66,5 +79,5 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #374151;
 }

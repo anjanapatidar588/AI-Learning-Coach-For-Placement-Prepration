@@ -24,6 +24,10 @@ const userSchema = new mongoose.Schema({
     enum: ['student', 'admin'],
     default: 'student',
   },
+  avatar: {
+    type: String,
+    default: '',
+  },
   targetCompanies: [{
     type: String,
     trim: true,

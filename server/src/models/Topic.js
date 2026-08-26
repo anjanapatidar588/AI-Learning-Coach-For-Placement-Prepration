@@ -21,6 +21,12 @@ const topicSchema = new mongoose.Schema({
     index: true,
   },
   order: { type: Number, default: 0 },
+  difficulty: {
+    type: String,
+    enum: ['Easy', 'Medium', 'Hard'],
+    default: 'Medium'
+  },
+  summary: { type: String, default: '' },
   prerequisites: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Topic',

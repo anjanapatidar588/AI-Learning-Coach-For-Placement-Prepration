@@ -16,10 +16,11 @@ const questionSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['coding', 'mcq', 'conceptual'],
+    enum: ['coding', 'mcq', 'conceptual', 'CODING', 'MCQ', 'SHORT_ANSWER'],
     default: 'coding',
   },
   problemStatement: { type: String, required: true },
+  description: { type: String },
   inputFormat: { type: String, default: '' },
   outputFormat: { type: String, default: '' },
   constraints: { type: String, default: '' },
@@ -35,10 +36,18 @@ const questionSchema = new mongoose.Schema({
     isHidden: { type: Boolean, default: false }
   }],
   mcqOptions: [{
-    optionId: { type: String, required: true },
-    text: { type: String, required: true },
+    optionId: { type: String },
+    optionText: { type: String },
+    text: { type: String },
     isCorrect: { type: Boolean, default: false }
   }],
+  hints: [{ type: String }],
+  solutionCode: {
+    cpp: { type: String, default: '' },
+    python: { type: String, default: '' },
+    java: { type: String, default: '' },
+    javascript: { type: String, default: '' }
+  },
   solutionExplanation: { type: String, default: '' },
   companyTags: [{ type: String }],
 }, { timestamps: true });

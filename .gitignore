@@ -1,6 +1,25 @@
+<<<<<<< HEAD
+=======
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Environment variables & secrets
+>>>>>>> cb85447 (chore: initialize project foundation)
 .env
 .env.local
 .env.*.local
 node_modules/
 dist/
+<<<<<<< HEAD
 .DS_Store
+=======
+build/
+*.log
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+>>>>>>> cb85447 (chore: initialize project foundation)

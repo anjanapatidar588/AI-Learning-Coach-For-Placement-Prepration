@@ -42,13 +42,21 @@ app.use('/api/v1/company', companyRoutes);
 app.use('/api/v1/admin', adminRoutes);
 
 // Health Check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'healthy', app: 'AI Placement Coach API', timestamp: new Date() });
-});
+const healthHandler = (req, res) => {
+  res.json({
+    status: 'healthy',
+    message: 'AI Placement Coach API is online',
+    app: 'AI Placement Coach API',
+    timestamp: new Date().toISOString(),
+    database: 'connected'
+  });
+};
+app.get('/api/health', healthHandler);
+app.get('/api/v1/health', healthHandler);
 
 // Global Error Handler
 app.use(errorHandler);
 
 app.listen(PORT, () => {
-  console.log(`[Server] AI Placement Coach Backend running on port ${PORT}`);
+  console.log(`[Server] AI Placement Coach Backend running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
 });
