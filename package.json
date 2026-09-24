@@ -1,0 +1,16 @@
+{
+  "name": "ai-placement-coach",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Full-stack AI Placement Coach Platform",
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix client\" \"npm run dev --prefix server\"",
+    "client:dev": "npm run dev --prefix client",
+    "server:dev": "npm run dev --prefix server",
+    "client:build": "npm run build --prefix client",
+    "server:start": "npm start --prefix server"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
