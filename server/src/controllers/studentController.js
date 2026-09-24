@@ -48,11 +48,14 @@ export const getStudentDashboard = async (req, res) => {
 
 export const getRoadmap = async (req, res) => {
   try {
-    let roadmap = await Roadmap.findOne({ userId: req.user._id });
+    const userId = req.user.userId || req.user._id;
+    const roadmap = await Roadmap.findOne({ userId }).select('-__v');
+    
     if (!roadmap) {
-      roadmap = await Roadmap.create({ userId: req.user._id, nodes: [] });
+      return res.json({ success: true, data: null, message: 'No roadmap found' });
     }
-    res.json({ success: true, data: roadmap.nodes });
+    
+    res.json({ success: true, data: roadmap });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -60,21 +63,24 @@ export const getRoadmap = async (req, res) => {
 
 export const recalculateRoadmap = async (req, res) => {
   try {
-    const userId = req.user._id;
-    const profile = await LearnerProfile.findOne({ userId });
-    const weaknesses = await WeaknessAnalysis.find({ userId });
-
-    const aiAdvice = await generateAIResponse({
-      persona: 'Career Coach',
-      systemPrompt: PERSONA_PROMPTS['Career Coach'],
-      userPrompt: 'Recalculate and re-prioritize learning roadmap based on recent weakness analysis and mastery levels.',
-      contextData: { profile, weaknesses, targetCompanies: req.user.targetCompanies, targetRole: req.user.targetRole }
-    });
+    const userId = req.user.userId || req.user._id;
+    
+    let roadmap = await Roadmap.findOne({ userId });
+    
+    if (!roadmap) {
+      roadmap = new Roadmap({ userId, nodes: [] });
+      roadmap.lastGeneratedAt = new Date();
+    } else {
+      roadmap.lastGeneratedAt = new Date();
+      roadmap.version += 1;
+    }
+    
+    await roadmap.save();
 
     res.json({
       success: true,
-      message: 'Personalized learning roadmap recalculated successfully',
-      aiFeedback: aiAdvice
+      message: 'Roadmap recalculated successfully',
+      data: roadmap
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -83,31 +89,77 @@ export const recalculateRoadmap = async (req, res) => {
 
 export const getProgressMetrics = async (req, res) => {
   try {
-    const userId = req.user._id;
-    let profile = await LearnerProfile.findOne({ userId });
+    const userId = req.user.userId || req.user._id;
 
-    const categoryBreakdown = [
-      { category: 'DSA', mastery: profile ? profile.dsaMastery : 45, totalSolved: 14, color: '#3B82F6' },
-      { category: 'Aptitude', mastery: profile ? profile.aptitudeMastery : 60, totalSolved: 8, color: '#10B981' },
-      { category: 'CS Core', mastery: profile ? profile.csCoreMastery : 55, totalSolved: 6, color: '#8B5CF6' }
-    ];
+    // Fetch all attempts for the authenticated student
+    const attempts = await AttemptTrack.find({ userId }).sort({ createdAt: -1 });
 
-    const weeklyProgress = [
-      { day: 'Mon', problems: 2, accuracy: 70 },
-      { day: 'Tue', problems: 4, accuracy: 80 },
-      { day: 'Wed', problems: 3, accuracy: 66 },
-      { day: 'Thu', problems: 5, accuracy: 90 },
-      { day: 'Fri', problems: 1, accuracy: 100 },
-      { day: 'Sat', problems: 4, accuracy: 75 },
-      { day: 'Sun', problems: 3, accuracy: 85 }
-    ];
+    const createCategoryMetrics = () => ({
+      totalAttempts: 0,
+      passedAttempts: 0,
+      failedAttempts: 0,
+      accuracy: 0,
+      totalTimeSpentSeconds: 0,
+      hintsUsed: 0
+    });
+
+    const progress = {
+      overall: createCategoryMetrics(),
+      dsa: createCategoryMetrics(),
+      aptitude: createCategoryMetrics(),
+      csCore: createCategoryMetrics()
+    };
+
+    attempts.forEach(attempt => {
+      const isPassed = attempt.status === 'Accepted';
+      
+      // Update overall
+      progress.overall.totalAttempts++;
+      if (isPassed) progress.overall.passedAttempts++;
+      else progress.overall.failedAttempts++;
+      progress.overall.totalTimeSpentSeconds += (attempt.timeSpentSeconds || 0);
+      progress.overall.hintsUsed += (attempt.hintsUsedCount || 0);
+
+      // Update category-specific
+      let catKey = null;
+      if (attempt.category === 'dsa') catKey = 'dsa';
+      else if (attempt.category === 'aptitude') catKey = 'aptitude';
+      else if (attempt.category === 'cs_core') catKey = 'csCore';
+
+      if (catKey) {
+        progress[catKey].totalAttempts++;
+        if (isPassed) progress[catKey].passedAttempts++;
+        else progress[catKey].failedAttempts++;
+        progress[catKey].totalTimeSpentSeconds += (attempt.timeSpentSeconds || 0);
+        progress[catKey].hintsUsed += (attempt.hintsUsedCount || 0);
+      }
+    });
+
+    // Calculate accuracy
+    const calculateAccuracy = (metrics) => {
+      if (metrics.totalAttempts === 0) return 0;
+      return Math.round((metrics.passedAttempts / metrics.totalAttempts) * 100);
+    };
+
+    progress.overall.accuracy = calculateAccuracy(progress.overall);
+    progress.dsa.accuracy = calculateAccuracy(progress.dsa);
+    progress.aptitude.accuracy = calculateAccuracy(progress.aptitude);
+    progress.csCore.accuracy = calculateAccuracy(progress.csCore);
+
+    // Recent performance (last 5 attempts)
+    const recentActivity = attempts.slice(0, 5).map(a => ({
+      questionId: a.questionId,
+      category: a.category,
+      status: a.status,
+      timeSpentSeconds: a.timeSpentSeconds,
+      createdAt: a.createdAt
+    }));
 
     res.json({
       success: true,
       data: {
-        profile,
-        categoryBreakdown,
-        weeklyProgress
+        ...progress,
+        recentActivity
       }
     });
   } catch (error) {
@@ -117,34 +169,61 @@ export const getProgressMetrics = async (req, res) => {
 
 export const getWeakAreas = async (req, res) => {
   try {
-    const userId = req.user._id;
-    let weaknesses = await WeaknessAnalysis.find({ userId });
+    const userId = req.user.userId || req.user._id;
+    
+    // Fetch all attempts for the authenticated user and populate question/topic
+    const attempts = await AttemptTrack.find({ userId }).populate({
+      path: 'questionId',
+      populate: { path: 'topicId' }
+    });
 
-    if (weaknesses.length === 0) {
-      // Mock data if initial user
-      weaknesses = [
-        {
-          _id: 'w-1',
-          topicTitle: 'Dynamic Programming - Memory Optimization',
-          category: 'dsa',
-          failureCount: 3,
-          accuracyPercentage: 33,
-          identifiedPattern: 'Overlapping subproblems state space confusion',
-          severity: 'High'
-        },
-        {
-          _id: 'w-2',
-          topicTitle: 'DBMS - Transaction Concurrency & Locking',
-          category: 'cs_core',
-          failureCount: 2,
-          accuracyPercentage: 50,
-          identifiedPattern: 'Confusion between Shared vs Exclusive locks',
-          severity: 'Medium'
+    const topicStats = {};
+
+    attempts.forEach(attempt => {
+      let topicName = 'Unknown Topic';
+      if (attempt.questionId) {
+        if (attempt.questionId.topicId && attempt.questionId.topicId.title) {
+          topicName = attempt.questionId.topicId.title;
+        } else if (attempt.questionId.title) {
+          topicName = attempt.questionId.title;
         }
-      ];
-    }
+      }
 
-    res.json({ success: true, data: weaknesses });
+      const category = attempt.category || 'unknown';
+      const key = `${category}::${topicName}`;
+
+      if (!topicStats[key]) {
+        topicStats[key] = {
+          topic: topicName,
+          category,
+          totalAttempts: 0,
+          passedAttempts: 0,
+          failedAttempts: 0
+        };
+      }
+
+      topicStats[key].totalAttempts += 1;
+      if (attempt.status === 'Accepted') {
+        topicStats[key].passedAttempts += 1;
+      } else {
+        topicStats[key].failedAttempts += 1;
+      }
+    });
+
+    const weakAreas = Object.values(topicStats)
+      .map(stat => {
+        stat.accuracy = Math.round((stat.passedAttempts / stat.totalAttempts) * 100);
+        return stat;
+      })
+      .filter(stat => stat.accuracy < 60)
+      .sort((a, b) => {
+        if (a.accuracy !== b.accuracy) {
+          return a.accuracy - b.accuracy; // lower accuracy first
+        }
+        return b.totalAttempts - a.totalAttempts; // higher attempts first
+      });
+
+    res.json({ success: true, data: { weakAreas } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -152,14 +231,96 @@ export const getWeakAreas = async (req, res) => {
 
 export const getAchievements = async (req, res) => {
   try {
-    const achievements = [
-      { id: 'ach-1', title: 'Code Pioneer', description: 'Solved first 10 DSA coding problems', icon: 'code', unlocked: true, unlockedAt: '2026-08-28' },
-      { id: 'ach-2', title: '5-Day Streak', description: 'Maintained active practice streak for 5 consecutive days', icon: 'flame', unlocked: true, unlockedAt: '2026-09-01' },
-      { id: 'ach-3', title: 'Aptitude Ace', description: 'Scored 90%+ in 3 Quantitative Aptitude quizzes', icon: 'zap', unlocked: true, unlockedAt: '2026-08-30' },
-      { id: 'ach-4', title: 'Interview Champion', description: 'Completed first full AI Mock Interview with 75%+ readiness score', icon: 'award', unlocked: false }
+    const userId = req.user.userId || req.user._id;
+
+    // Fetch all attempts for chronological processing
+    const attempts = await AttemptTrack.find({ userId }).sort({ createdAt: 1 });
+
+    const definitions = [
+      { id: 'ach-first-practice', title: 'First Steps', description: 'Started your first practice attempt', type: 'milestone', icon: 'play' },
+      { id: 'ach-10-attempts', title: 'Code Pioneer', description: 'Completed 10 practice attempts', type: 'milestone', icon: 'code' },
+      { id: 'ach-first-success', title: 'First Success', description: 'Successfully passed your first problem', type: 'milestone', icon: 'check-circle' },
+      { id: 'ach-dsa-beginner', title: 'DSA Beginner', description: 'Attempted your first DSA problem', type: 'milestone', icon: 'database' },
+      { id: 'ach-aptitude-beginner', title: 'Aptitude Beginner', description: 'Attempted your first Aptitude problem', type: 'milestone', icon: 'brain' }
     ];
 
-    res.json({ success: true, data: achievements });
+    let metrics = {
+      totalAttempts: 0,
+      passedAttempts: 0,
+      dsaAttempts: 0,
+      aptitudeAttempts: 0
+    };
+
+    let unlockDates = {};
+
+    attempts.forEach(att => {
+      metrics.totalAttempts++;
+      if (att.status === 'Accepted') metrics.passedAttempts++;
+      if (att.category === 'dsa') metrics.dsaAttempts++;
+      if (att.category === 'aptitude') metrics.aptitudeAttempts++;
+      
+      if (metrics.totalAttempts === 1 && !unlockDates['ach-first-practice']) unlockDates['ach-first-practice'] = att.createdAt;
+      if (metrics.totalAttempts === 10 && !unlockDates['ach-10-attempts']) unlockDates['ach-10-attempts'] = att.createdAt;
+      if (metrics.passedAttempts === 1 && !unlockDates['ach-first-success']) unlockDates['ach-first-success'] = att.createdAt;
+      if (metrics.dsaAttempts === 1 && !unlockDates['ach-dsa-beginner']) unlockDates['ach-dsa-beginner'] = att.createdAt;
+      if (metrics.aptitudeAttempts === 1 && !unlockDates['ach-aptitude-beginner']) unlockDates['ach-aptitude-beginner'] = att.createdAt;
+    });
+
+    const achievements = definitions.map(def => {
+      const date = unlockDates[def.id];
+      return {
+        ...def,
+        unlocked: !!date,
+        unlockedAt: date ? date.toISOString().split('T')[0] : null
+      };
+    });
+
+    // Calculate Streak
+    const uniqueDates = [...new Set(attempts.map(a => a.createdAt.toISOString().split('T')[0]))].sort();
+    
+    let currentStreak = 0;
+    let longestStreak = 0;
+
+    if (uniqueDates.length > 0) {
+      let current = 1;
+      let max = 1;
+
+      for (let i = 1; i < uniqueDates.length; i++) {
+        const prevDate = new Date(uniqueDates[i - 1]);
+        const currDate = new Date(uniqueDates[i]);
+        const diffTime = currDate - prevDate;
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 1) {
+          current++;
+          max = Math.max(max, current);
+        } else {
+          current = 1;
+        }
+      }
+      longestStreak = max;
+
+      const todayStr = new Date().toISOString().split('T')[0];
+      const yesterdayDate = new Date();
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+      const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+      
+      const lastDateStr = uniqueDates[uniqueDates.length - 1];
+      if (lastDateStr === todayStr || lastDateStr === yesterdayStr) {
+        currentStreak = current;
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        achievements,
+        streak: {
+          current: currentStreak,
+          longest: longestStreak
+        }
+      }
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
