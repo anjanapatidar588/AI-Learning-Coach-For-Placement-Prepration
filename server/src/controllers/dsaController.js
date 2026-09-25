@@ -4,6 +4,7 @@ import AttemptTrack from '../models/AttemptTrack.js';
 import WeaknessAnalysis from '../models/WeaknessAnalysis.js';
 import { generateAIResponse } from '../services/ai/geminiClient.js';
 import { PERSONA_PROMPTS } from '../services/ai/promptTemplates.js';
+import { executeCode } from '../services/codeExecutionService.js';
 
 export const getDSATopics = async (req, res) => {
   try {
@@ -151,56 +152,82 @@ export const getDSAQuestionBySlug = async (req, res) => {
 
 export const submitDSACode = async (req, res) => {
   try {
-    const { questionId, code, language } = req.body;
-    const userId = req.user._id;
+    const { questionId, slug, code, language, timeSpentSeconds } = req.body;
+    const userId = req.user.userId || req.user._id;
 
-    // Simulate code execution sandbox
-    const passed = true;
-    const status = passed ? 'Accepted' : 'Wrong Answer';
-    const passedTestCases = 3;
-    const totalTestCases = 3;
+    if (!code) {
+      return res.status(400).json({ success: false, message: 'Code is required' });
+    }
 
-    let aiFeedback = '';
-    if (passed) {
-      aiFeedback = 'Excellent execution! Your solution achieves O(N) time complexity and O(N) space complexity using a Hash Map.';
+    const supportedLanguages = ['javascript', 'python', 'cpp', 'java'];
+    if (!language || !supportedLanguages.includes(language.toLowerCase())) {
+      return res.status(400).json({ success: false, message: 'Invalid or missing language' });
+    }
+
+    if (!questionId && !slug) {
+      return res.status(400).json({ success: false, message: 'questionId or slug is required' });
+    }
+
+    let questionQuery = {};
+    if (questionId) {
+      questionQuery._id = questionId;
     } else {
-      aiFeedback = 'Your solution failed on hidden edge cases with duplicate elements. Consider storing index mappings correctly.';
-      // Log weakness
-      await WeaknessAnalysis.create({
-        userId,
-        topicId: questionId || '650000000000000000000001',
-        topicTitle: 'Arrays & Two Pointers',
-        category: 'dsa',
-        failureCount: 1,
-        severity: 'High',
-        identifiedPattern: 'Edge case handling failure on duplicate array elements'
-      }).catch(() => {});
+      questionQuery.slug = slug;
+    }
+
+    const question = await Question.findOne(questionQuery).populate('topicId');
+    if (!question) {
+      return res.status(404).json({ success: false, message: 'Question not found' });
+    }
+
+    if (!question.topicId || question.topicId.category !== 'dsa') {
+      return res.status(404).json({ success: false, message: 'Question not found' });
+    }
+
+    const testCases = question.testCases && question.testCases.length > 0 ? question.testCases : [];
+    
+    const executionResult = await executeCode({
+      language: language.toLowerCase(),
+      code,
+      testCases
+    });
+
+    if (!executionResult.isAvailable) {
+      return res.status(503).json({
+        success: false,
+        message: executionResult.message,
+        data: {
+          status: executionResult.status
+        }
+      });
     }
 
     const attempt = await AttemptTrack.create({
       userId,
-      questionId: questionId || '650000000000000000000001',
+      questionId: question._id,
       category: 'dsa',
       submittedCode: code,
-      language: language || 'javascript',
-      status,
-      passedTestCases,
-      totalTestCases,
-      timeSpentSeconds: 120,
-      aiFeedbackSummary: aiFeedback
-    }).catch(() => ({ status, passedTestCases, totalTestCases, aiFeedbackSummary: aiFeedback }));
+      language: language.toLowerCase(),
+      status: executionResult.status,
+      passedTestCases: executionResult.passedTests,
+      totalTestCases: executionResult.totalTests,
+      timeSpentSeconds: timeSpentSeconds || 0
+    });
 
     res.json({
       success: true,
       data: {
-        status,
-        passedTestCases,
-        totalTestCases,
-        executionTimeMs: 45,
-        memoryKb: 14200,
-        aiFeedbackSummary: aiFeedback
+        status: executionResult.status,
+        passedTestCases: executionResult.passedTests,
+        totalTestCases: executionResult.totalTests,
+        executionTimeMs: executionResult.executionTimeMs,
+        memoryKb: executionResult.memoryKb,
+        output: executionResult.output,
+        error: executionResult.error,
+        attemptId: attempt._id
       }
     });
+
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -208,20 +235,74 @@ export const submitDSACode = async (req, res) => {
 
 export const getDSAAIHint = async (req, res) => {
   try {
-    const { problemTitle, code, language, questionText } = req.body;
+    const { questionId, code, language, error: codeError, attemptId } = req.body;
+    const userId = req.user.userId || req.user._id;
+
+    if (!questionId) {
+      return res.status(400).json({ success: false, message: 'questionId is required' });
+    }
+
+    const isQuestionIdValid = /^[0-9a-fA-F]{24}$/.test(questionId);
+    if (!isQuestionIdValid) {
+      return res.status(400).json({ success: false, message: 'Invalid questionId format' });
+    }
+
+    if (attemptId) {
+      const isAttemptIdValid = /^[0-9a-fA-F]{24}$/.test(attemptId);
+      if (!isAttemptIdValid) {
+        return res.status(400).json({ success: false, message: 'Invalid attemptId format' });
+      }
+      const attempt = await AttemptTrack.findOne({ _id: attemptId, userId });
+      if (!attempt) {
+        return res.status(403).json({ success: false, message: 'Attempt not found or belongs to another user' });
+      }
+      if (attempt.questionId.toString() !== questionId) {
+        return res.status(400).json({ success: false, message: 'attemptId does not match the provided questionId' });
+      }
+    }
+
+    const question = await Question.findById(questionId).populate('topicId');
+    if (!question) {
+      return res.status(404).json({ success: false, message: 'Question not found' });
+    }
+    if (!question.topicId || question.topicId.category !== 'dsa') {
+      return res.status(404).json({ success: false, message: 'Question not found or not a DSA question' });
+    }
+
+    const contextData = {
+      problemTitle: question.title,
+      problemStatement: question.description,
+      inputFormat: question.inputFormat,
+      outputFormat: question.outputFormat,
+      constraints: question.constraints,
+      difficulty: question.difficulty,
+      topic: question.topicId.title,
+      language: language || undefined,
+      code: code || undefined,
+      error: codeError || undefined,
+    };
+
+    let userPrompt = `The student is requesting a hint for the DSA problem "${question.title}".`;
+    if (code) {
+      userPrompt += `\n\nStudent Current Code (${language || 'unknown'}):\n${code}`;
+    }
+    if (codeError) {
+      userPrompt += `\n\nError encountered:\n${codeError}`;
+    }
 
     const hint = await generateAIResponse({
       persona: 'DSA Mentor',
-      systemPrompt: PERSONA_PROMPTS['DSA Mentor'],
-      userPrompt: `The student is working on the DSA problem "${problemTitle}". Provide a helpful hint without giving away the complete code answer.
-Problem text: ${questionText}
-Student Current Code (${language}):
-${code}`,
-      contextData: { problemTitle, language }
+      systemPrompt: "You are a DSA Mentor for a placement preparation platform. Give contextual hints that help the student discover the solution themselves. Do not provide the complete solution or full replacement code unless the system explicitly allows it. Prefer progressive hints and explain the relevant pattern or mistake.",
+      userPrompt,
+      contextData,
+      failIfUnavailable: true
     });
 
-    res.json({ success: true, hint });
+    res.json({ success: true, data: { hint, mentor: 'DSA Mentor' } });
   } catch (error) {
+    if (error.message === 'Gemini API is unavailable' || (error.message && error.message.includes('API key'))) {
+      return res.status(503).json({ success: false, message: 'Gemini AI Service is currently unavailable' });
+    }
     res.status(500).json({ success: false, message: error.message });
   }
 };

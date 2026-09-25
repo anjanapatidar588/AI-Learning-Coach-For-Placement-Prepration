@@ -1,15 +1,15 @@
 import Topic from '../models/Topic.js';
+import Question from '../models/Question.js';
+import AttemptTrack from '../models/AttemptTrack.js';
 import { generateAIResponse } from '../services/ai/geminiClient.js';
 import { PERSONA_PROMPTS } from '../services/ai/promptTemplates.js';
 
 export const getCSCoreSubjects = async (req, res) => {
   try {
-    const subjects = [
-      { id: 'dbms', name: 'Database Management Systems (DBMS)', icon: 'database', topicsCount: 12, mastery: 65, description: 'Relational model, SQL, B-Trees, Indexing, ACID, Normalization' },
-      { id: 'os', name: 'Operating Systems (OS)', icon: 'cpu', topicsCount: 10, mastery: 50, description: 'Process management, threads, deadlock, virtual memory, paging' },
-      { id: 'cn', name: 'Computer Networks (CN)', icon: 'wifi', topicsCount: 9, mastery: 55, description: 'OSI 7 layers, TCP/IP, HTTP/HTTPS, DNS, Subnetting' },
-      { id: 'oops', name: 'Object-Oriented Programming (OOP)', icon: 'box', topicsCount: 8, mastery: 70, description: 'Encapsulation, Polymorphism, Abstraction, Inheritance, Design Patterns' }
-    ];
+    const subjects = await Topic.find({ category: 'cs_core' })
+      .sort({ order: 1 })
+      .select('-__v')
+      .lean();
 
     res.json({ success: true, data: subjects });
   } catch (error) {
@@ -17,44 +17,20 @@ export const getCSCoreSubjects = async (req, res) => {
   }
 };
 
-export const getCSCoreTopicDetail = async (req, res) => {
+export const getCSCoreTopics = async (req, res) => {
   try {
     const { subjectId } = req.params;
-    const topicData = {
-      subjectId,
-      title: subjectId === 'dbms' ? 'Transactions & ACID Properties' : 'Process Synchronization & Semaphores',
-      contentMarkdown: subjectId === 'dbms'
-        ? `### Database Transactions & ACID Properties
 
-A transaction is a logical unit of database processing that includes one or more database access operations.
+    if (!subjectId || typeof subjectId !== 'string') {
+      return res.status(400).json({ success: false, message: 'Invalid subjectId' });
+    }
 
-#### 1. Atomicity ("All or Nothing")
-Either all operations of the transaction are executed successfully or none are. If a failure occurs mid-way, the transaction is rolled back.
+    const topics = await Topic.find({ category: 'cs_core', subject: subjectId })
+      .sort({ order: 1 })
+      .select('-__v')
+      .lean();
 
-#### 2. Consistency
-The database must transition from one valid state to another valid state, maintaining all integrity constraints.
-
-#### 3. Isolation
-Concurrently executing transactions must execute independently without interfering with each other.
-
-#### 4. Durability
-Once a transaction commits, its updates persist permanently in non-volatile storage, even during system crashes.`
-        : `### Process Synchronization & Deadlocks
-
-#### What is a Race Condition?
-A race condition occurs when two or more processes access shared data concurrently and the final outcome depends on the execution order.
-
-#### Critical Section Problem Requirements:
-1. **Mutual Exclusion**: Only one process at a time can execute in its critical section.
-2. **Progress**: Selection of next process cannot be postponed indefinitely.
-3. **Bounded Waiting**: Bound on the number of times other processes are allowed to enter their critical section after a request has been made.`,
-      flashcards: [
-        { front: 'What is a B+ Tree leaf node linked list used for?', back: 'Fast sequential and range queries without traversing parent nodes.' },
-        { front: 'What is Dirty Read?', back: 'Reading uncommitted data written by another concurrent transaction.' }
-      ]
-    };
-
-    res.json({ success: true, data: topicData });
+    res.json({ success: true, data: topics });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -71,6 +47,113 @@ export const getCSCoreAIConcept = async (req, res) => {
     });
 
     res.json({ success: true, explanation: response });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const submitCSCoreQuiz = async (req, res) => {
+  try {
+    const { topicId, answers } = req.body;
+    const userId = req.user.userId;
+
+    if (!topicId) {
+      return res.status(400).json({ success: false, message: 'topicId is required' });
+    }
+
+    const isTopicObjectId = /^[0-9a-fA-F]{24}$/.test(topicId);
+    if (!isTopicObjectId) {
+      return res.status(400).json({ success: false, message: 'Invalid topicId format' });
+    }
+
+    const topic = await Topic.findOne({ _id: topicId });
+    if (!topic || topic.category !== 'cs_core') {
+      return res.status(404).json({ success: false, message: 'Topic not found' });
+    }
+
+    if (!Array.isArray(answers)) {
+      return res.status(400).json({ success: false, message: 'Answers must be an array' });
+    }
+
+    const validQuestions = await Question.find({ topicId: topic._id });
+    const totalQuestions = validQuestions.length;
+    
+    const questionMap = {};
+    validQuestions.forEach(q => {
+      questionMap[q._id.toString()] = q;
+    });
+
+    let correctAnswers = 0;
+    let incorrectAnswers = 0;
+    const attemptRecords = [];
+    const processedQuestionIds = new Set();
+
+    for (const ans of answers) {
+      if (!ans.questionId || !ans.selectedOption) continue;
+      
+      const qIdStr = ans.questionId.toString();
+      
+      if (processedQuestionIds.has(qIdStr) || !questionMap[qIdStr]) {
+        continue;
+      }
+      processedQuestionIds.add(qIdStr);
+
+      const question = questionMap[qIdStr];
+      let isCorrect = false;
+
+      if ((question.type === 'mcq' || question.type === 'MCQ') && Array.isArray(question.mcqOptions)) {
+        const correctOption = question.mcqOptions.find(o => o.isCorrect === true);
+        if (correctOption && correctOption.optionId === ans.selectedOption) {
+          isCorrect = true;
+        }
+      }
+
+      if (isCorrect) {
+        correctAnswers++;
+      } else {
+        incorrectAnswers++;
+      }
+
+      attemptRecords.push({
+        userId,
+        questionId: question._id,
+        category: 'cs_core',
+        submittedCode: ans.selectedOption,
+        status: isCorrect ? 'Accepted' : 'Wrong Answer',
+        timeSpentSeconds: ans.timeSpentSeconds || 0
+      });
+    }
+
+    const attemptedQuestions = correctAnswers + incorrectAnswers;
+    const unansweredQuestions = totalQuestions - attemptedQuestions;
+    const accuracy = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
+
+    let savedAttempts = [];
+    if (attemptRecords.length > 0) {
+      savedAttempts = await AttemptTrack.insertMany(attemptRecords);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        topic: {
+          _id: topic._id,
+          title: topic.title,
+          slug: topic.slug,
+          subject: topic.subject
+        },
+        result: {
+          totalQuestions,
+          attemptedQuestions,
+          correctAnswers,
+          incorrectAnswers,
+          unansweredQuestions,
+          accuracy
+        },
+        attemptIds: savedAttempts.map(a => a._id)
+      }
+    });
+
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

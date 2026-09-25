@@ -7,13 +7,15 @@ import {
 } from '../controllers/aptitudeController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
+import { authorize } from '../middleware/roleMiddleware.js';
+
 const router = express.Router();
 
 router.use(protect);
 
-router.get('/topics', getAptitudeTopics);
-router.get('/quiz/:topicId', getAptitudeQuiz);
-router.post('/quiz/submit', submitAptitudeQuiz);
-router.post('/ai-explain', getAptitudeAIExplain);
+router.get('/topics', authorize('student'), getAptitudeTopics);
+router.get('/quiz/:topicId', authorize('student'), getAptitudeQuiz);
+router.post('/quiz/submit', authorize('student'), submitAptitudeQuiz);
+router.post('/ai-explain', authorize('student'), getAptitudeAIExplain);
 
 export default router;

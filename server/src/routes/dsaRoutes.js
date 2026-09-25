@@ -16,7 +16,7 @@ router.use(protect);
 router.get('/topics', authorize('student'), getDSATopics);
 router.get('/questions', authorize('student'), getDSAQuestions);
 router.get('/questions/:slug', authorize('student'), getDSAQuestionBySlug);
-router.post('/submit', submitDSACode);
-router.post('/ai-hint', getDSAAIHint);
+router.post('/submit', authorize('student'), submitDSACode);
+router.post('/ai-hint', authorize('student'), getDSAAIHint);
 
 export default router;

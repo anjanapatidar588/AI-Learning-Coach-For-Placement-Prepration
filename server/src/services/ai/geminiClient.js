@@ -5,7 +5,7 @@ if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'mock_key_for_t
   genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 }
 
-export const generateAIResponse = async ({ persona, systemPrompt, userPrompt, contextData }) => {
+export const generateAIResponse = async ({ persona, systemPrompt, userPrompt, contextData, failIfUnavailable = false }) => {
   try {
     if (genAI) {
       const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
@@ -16,6 +16,13 @@ export const generateAIResponse = async ({ persona, systemPrompt, userPrompt, co
     }
   } catch (error) {
     console.warn('[AIService] Gemini API call failed or unconfigured, returning intelligent persona simulation fallback:', error.message);
+    if (failIfUnavailable) {
+      throw new Error('Gemini API is unavailable');
+    }
+  }
+
+  if (failIfUnavailable && !genAI) {
+    throw new Error('Gemini API is unavailable');
   }
 
   // High quality simulated response fallback for development/demo

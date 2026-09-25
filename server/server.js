@@ -14,6 +14,7 @@ import interviewRoutes from './src/routes/interviewRoutes.js';
 import resumeRoutes from './src/routes/resumeRoutes.js';
 import companyRoutes from './src/routes/companyRoutes.js';
 import adminRoutes from './src/routes/adminRoutes.js';
+import practiceRoutes from './src/routes/practiceRoutes.js';
 
 dotenv.config();
 
@@ -40,6 +41,7 @@ app.use('/api/v1/interview', interviewRoutes);
 app.use('/api/v1/resume', resumeRoutes);
 app.use('/api/v1/company', companyRoutes);
 app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/practice', practiceRoutes);
 
 // Health Check
 const healthHandler = (req, res) => {
