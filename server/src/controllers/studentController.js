@@ -7,6 +7,7 @@ import Question from '../models/Question.js';
 import User from '../models/User.js';
 import { generateAIResponse } from '../services/ai/geminiClient.js';
 import { PERSONA_PROMPTS } from '../services/ai/promptTemplates.js';
+import { generateRecommendations } from '../services/recommendationService.js';
 
 export const getStudentDashboard = async (req, res) => {
   try {
@@ -380,6 +381,19 @@ export const updateStudentProfile = async (req, res) => {
     await profile.save();
 
     res.json({ success: true, data: profile });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getRecommendations = async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user._id;
+    const recommendations = await generateRecommendations(userId);
+    res.json({
+      success: true,
+      data: recommendations
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

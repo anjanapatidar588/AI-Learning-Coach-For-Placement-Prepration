@@ -8,6 +8,6 @@ const router = express.Router();
 router.use(protect);
 
 router.get('/', authorize('student'), getCompanies);
-router.get('/:companyId', getCompanyDetail);
+router.get('/:companyId', authorize('student'), getCompanyDetail);
 
 export default router;

@@ -7,7 +7,8 @@ import {
   getWeakAreas,
   getAchievements,
   getStudentProfile,
-  updateStudentProfile
+  updateStudentProfile,
+  getRecommendations
 } from '../controllers/studentController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { authorize } from '../middleware/roleMiddleware.js';
@@ -26,5 +27,6 @@ router.post('/roadmap/recalculate', recalculateRoadmap);
 router.get('/progress', getProgressMetrics);
 router.get('/weak-areas', getWeakAreas);
 router.get('/achievements', getAchievements);
+router.get('/recommendations', getRecommendations);
 
 export default router;

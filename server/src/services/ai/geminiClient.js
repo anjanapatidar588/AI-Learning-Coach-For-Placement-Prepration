@@ -1,31 +1,85 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-let genAI = null;
-if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'mock_key_for_testing') {
-  genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-}
+/**
+ * Dynamically resolves a GoogleGenerativeAI instance if a valid server API key is configured.
+ * Safely ignores mock/placeholder keys.
+ *
+ * @returns {GoogleGenerativeAI|null}
+ */
+const getGenerativeClient = () => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || typeof apiKey !== 'string') {
+    return null;
+  }
+  const trimmedKey = apiKey.trim();
+  if (
+    !trimmedKey ||
+    trimmedKey === 'mock_key_for_testing' ||
+    trimmedKey === 'your_gemini_api_key_here'
+  ) {
+    return null;
+  }
+  return new GoogleGenerativeAI(trimmedKey);
+};
 
+/**
+ * Generates an AI response using Google Gemini API (gemini-3.8-flash with candidate model fallback).
+ * Preserves the existing generateAIResponse interface.
+ * Safely masks API keys and returns clean error state on failures.
+ *
+ * @param {object} params
+ * @param {string} params.persona
+ * @param {string} params.systemPrompt
+ * @param {string} params.userPrompt
+ * @param {object} [params.contextData]
+ * @param {boolean} [params.failIfUnavailable=false]
+ * @returns {Promise<string>}
+ */
 export const generateAIResponse = async ({ persona, systemPrompt, userPrompt, contextData, failIfUnavailable = false }) => {
-  try {
-    if (genAI) {
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-      const fullPrompt = `${systemPrompt}\n\nContext Data: ${JSON.stringify(contextData || {})}\n\nUser Question/Input: ${userPrompt}`;
-      const result = await model.generateContent(fullPrompt);
-      const response = await result.response;
-      return response.text();
+  const genAI = getGenerativeClient();
+
+  if (genAI) {
+    const candidateModels = [
+      process.env.GEMINI_MODEL || 'gemini-3.8-flash',
+      'gemini-3-flash-preview',
+      'gemini-3.1-flash-lite-preview'
+    ];
+
+    let lastError = null;
+
+    for (const modelName of candidateModels) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const fullPrompt = `${systemPrompt}\n\nContext Data: ${JSON.stringify(contextData || {})}\n\nUser Question/Input: ${userPrompt}`;
+        const result = await model.generateContent(fullPrompt);
+        const response = await result.response;
+        const responseText = response.text();
+
+        if (responseText && typeof responseText === 'string') {
+          return responseText;
+        }
+      } catch (error) {
+        lastError = error;
+        // If high demand spike (503) or model unavailable (404), try next candidate model
+        if (error.message && (error.message.includes('503') || error.message.includes('high demand') || error.message.includes('not found'))) {
+          continue;
+        }
+        break;
+      }
     }
-  } catch (error) {
-    console.warn('[AIService] Gemini API call failed or unconfigured, returning intelligent persona simulation fallback:', error.message);
-    if (failIfUnavailable) {
-      throw new Error('Gemini API is unavailable');
+
+    if (lastError) {
+      const rawMsg = lastError.message || 'Gemini API Error';
+      const safeMsg = rawMsg.replace(/key=[^&%\s]+/gi, 'key=***').replace(/AIzaSy[A-Za-z0-9_-]+/g, 'AIzaSy***');
+      console.warn('[AIService] Gemini API call failed safely:', safeMsg);
     }
   }
 
-  if (failIfUnavailable && !genAI) {
+  if (failIfUnavailable) {
     throw new Error('Gemini API is unavailable');
   }
 
-  // High quality simulated response fallback for development/demo
+  // Fallback simulation for non-critical development/demo when failIfUnavailable is false
   return getSimulatedPersonaResponse(persona, userPrompt, contextData);
 };
 
