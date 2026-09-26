@@ -159,13 +159,24 @@ export const submitDSACode = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Code is required' });
     }
 
+    if (typeof code !== 'string' || code.length > 50000) {
+      return res.status(400).json({ success: false, message: 'Source code exceeds maximum allowed size' });
+    }
+
     const supportedLanguages = ['javascript', 'python', 'cpp', 'java'];
-    if (!language || !supportedLanguages.includes(language.toLowerCase())) {
-      return res.status(400).json({ success: false, message: 'Invalid or missing language' });
+    if (!language || typeof language !== 'string' || !supportedLanguages.includes(language.toLowerCase())) {
+      return res.status(400).json({ success: false, message: 'Language is not supported for code execution.' });
     }
 
     if (!questionId && !slug) {
       return res.status(400).json({ success: false, message: 'questionId or slug is required' });
+    }
+
+    if (questionId) {
+      const isObjectId = /^[0-9a-fA-F]{24}$/.test(questionId);
+      if (!isObjectId) {
+        return res.status(400).json({ success: false, message: 'Invalid questionId format' });
+      }
     }
 
     let questionQuery = {};
@@ -195,9 +206,9 @@ export const submitDSACode = async (req, res) => {
     if (!executionResult.isAvailable) {
       return res.status(503).json({
         success: false,
-        message: executionResult.message,
+        message: executionResult.message || 'Code execution service is currently unavailable. Please try again later.',
         data: {
-          status: executionResult.status
+          status: executionResult.status || 'Execution Unavailable'
         }
       });
     }

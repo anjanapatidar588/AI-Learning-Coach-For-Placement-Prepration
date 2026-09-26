@@ -28,11 +28,13 @@ import MyProgress from './modules/student/MyProgress';
 import WeakAreas from './modules/student/WeakAreas';
 import Achievements from './modules/student/Achievements';
 import ProfileSettings from './modules/student/ProfileSettings';
+import BaselineAssessment from './modules/student/BaselineAssessment';
 
 // Admin Modules
 import AdminDashboard from './modules/admin/AdminDashboard';
 import StudentManagement from './modules/admin/StudentManagement';
 import QuestionManagement from './modules/admin/QuestionManagement';
+import TopicManagement from './modules/admin/TopicManagement';
 import DSATopicMgmt from './modules/admin/DSATopicMgmt';
 import AptitudeTopicMgmt from './modules/admin/AptitudeTopicMgmt';
 import CSCoreContentMgmt from './modules/admin/CSCoreContentMgmt';
@@ -85,9 +87,11 @@ function AppRoutes() {
         <Route path="company-prep" element={<CompanyPrep />} />
         <Route path="resume-analyzer" element={<ResumeAnalyzer />} />
         <Route path="progress" element={<MyProgress />} />
+        <Route path="my-progress" element={<Navigate to="/student/progress" replace />} />
         <Route path="weak-areas" element={<WeakAreas />} />
         <Route path="achievements" element={<Achievements />} />
         <Route path="profile" element={<ProfileSettings />} />
+        <Route path="assessment/baseline" element={<BaselineAssessment />} />
       </Route>
 
       {/* Protected Admin Control Panel Routes */}
@@ -103,6 +107,7 @@ function AppRoutes() {
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="students" element={<StudentManagement />} />
         <Route path="questions" element={<QuestionManagement />} />
+        <Route path="topics" element={<TopicManagement />} />
         <Route path="dsa-topics" element={<DSATopicMgmt />} />
         <Route path="aptitude-topics" element={<AptitudeTopicMgmt />} />
         <Route path="cs-core-content" element={<CSCoreContentMgmt />} />

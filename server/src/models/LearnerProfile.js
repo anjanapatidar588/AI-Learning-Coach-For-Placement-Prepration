@@ -43,6 +43,9 @@ const learnerProfileSchema = new mongoose.Schema({
       scoreWeight: { type: Number, default: 1.0 },
     },
   ],
+  baselineAssessmentCompleted: { type: Boolean, default: false },
+  baselineScore: { type: Number, default: 0, min: 0, max: 100 },
+  baselineCompletedAt: { type: Date },
 }, { timestamps: true });
 
 export default mongoose.model('LearnerProfile', learnerProfileSchema);

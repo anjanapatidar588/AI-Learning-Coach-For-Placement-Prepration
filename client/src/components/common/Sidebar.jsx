@@ -60,9 +60,9 @@ export default function Sidebar() {
   const navItems = isAdmin ? adminNavItems : studentNavItems;
 
   return (
-    <aside className="w-64 shrink-0 border-r border-slate-800/80 bg-slate-950/90 flex flex-col justify-between py-4 px-3 min-h-[calc(100vh-57px)]">
+    <aside className="w-64 shrink-0 border-r border-slate-800/60 bg-[#0b0f19] flex flex-col justify-between py-4 px-3 min-h-[calc(100vh-57px)]">
       <div className="space-y-1">
-        <div className="px-3 py-2 text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
+        <div className="px-3 py-2 text-[10px] font-semibold tracking-wider text-slate-400 uppercase font-mono">
           {isAdmin ? 'ADMINISTRATION' : 'LEARNING HUB'}
         </div>
         <nav className="space-y-1">
@@ -73,16 +73,16 @@ export default function Sidebar() {
                 key={item.path}
                 to={item.path}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all duration-200 ${
+                  `flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 ${
                     isActive
-                      ? 'bg-blue-600/15 text-blue-400 border border-blue-500/30 shadow-sm shadow-blue-500/10'
+                      ? 'bg-indigo-600/90 text-white shadow-md shadow-indigo-600/20 font-semibold'
                       : item.highlight
-                      ? 'bg-purple-500/10 text-purple-300 border border-purple-500/20 hover:bg-purple-500/20'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/80'
+                      ? 'bg-indigo-950/40 text-indigo-300 border border-indigo-500/25 hover:bg-indigo-900/40'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
                   }`
                 }
               >
-                <Icon className={`h-4 w-4 ${item.highlight ? 'text-purple-400 animate-pulse' : ''}`} />
+                <Icon className={`h-4 w-4 shrink-0 ${item.highlight ? 'text-indigo-400' : ''}`} />
                 <span>{item.label}</span>
               </NavLink>
             );
@@ -90,15 +90,15 @@ export default function Sidebar() {
         </nav>
       </div>
 
-      <div className="p-3 glass-panel rounded-xl border border-slate-800/80 mt-6">
-        <div className="flex items-center gap-2 text-xs font-medium text-slate-300 mb-1">
-          <Sparkles className="h-4 w-4 text-amber-400" />
+      <div className="p-3.5 glass-card rounded-xl border border-slate-800/60 mt-6">
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-200 mb-1">
+          <Sparkles className="h-4 w-4 text-indigo-400" />
           <span>Placement Readiness</span>
         </div>
-        <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden my-2">
-          <div className="bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-400 h-full w-[74%] rounded-full"></div>
+        <div className="w-full bg-slate-800/80 h-2 rounded-full overflow-hidden my-2">
+          <div className="bg-gradient-to-r from-indigo-500 via-indigo-400 to-emerald-400 h-full w-[74%] rounded-full"></div>
         </div>
-        <div className="flex justify-between text-[10px] text-slate-400">
+        <div className="flex justify-between text-[10px] text-slate-400 font-mono">
           <span>Current Index</span>
           <span className="font-bold text-emerald-400">74% Target</span>
         </div>
@@ -106,3 +106,4 @@ export default function Sidebar() {
     </aside>
   );
 }
+

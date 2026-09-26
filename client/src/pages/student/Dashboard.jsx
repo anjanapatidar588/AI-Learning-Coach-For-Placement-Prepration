@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import API from '../../services/api';
+import SmartRecommendations from '../../components/student/SmartRecommendations';
 import {
   Sparkles,
   Flame,
@@ -71,18 +72,39 @@ export default function StudentDashboard() {
             </p>
           </div>
 
-          <div className="flex items-center gap-4 bg-slate-950/60 p-4 rounded-xl border border-slate-800 shrink-0">
-            <div className="text-center px-3 border-r border-slate-800">
+          <div className="flex flex-col sm:flex-row items-center gap-4 bg-slate-950/70 p-4 rounded-xl border border-slate-800 shrink-0">
+            <div className="text-center px-3 border-b sm:border-b-0 sm:border-r border-slate-800 pb-2 sm:pb-0 w-full sm:w-auto">
               <div className="flex items-center justify-center gap-1 text-amber-400 font-bold text-xl">
                 <Flame className="h-5 w-5 fill-amber-400" />
-                <span>5 Days</span>
+                <span>{data?.profile?.currentStreak || 0} Days</span>
               </div>
               <div className="text-[10px] text-slate-400 uppercase tracking-wider font-medium mt-0.5">Active Streak</div>
             </div>
 
-            <div className="text-center px-3">
-              <div className="text-2xl font-extrabold text-emerald-400">74%</div>
-              <div className="text-[10px] text-slate-400 uppercase tracking-wider font-medium mt-0.5">Placement Index</div>
+            <div className="text-center px-3 space-y-1">
+              <div className="flex items-center justify-center gap-2">
+                <span className={`text-2xl font-extrabold ${
+                  (data?.readinessScore || 0) >= 85 ? 'text-emerald-400' :
+                  (data?.readinessScore || 0) >= 65 ? 'text-blue-400' :
+                  (data?.readinessScore || 0) >= 40 ? 'text-amber-400' : 'text-slate-400'
+                }`}>
+                  {data?.readinessScore ?? 0}%
+                </span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                  data?.readinessDetails?.level === 'Placement Ready' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                  data?.readinessDetails?.level === 'Good' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
+                  data?.readinessDetails?.level === 'Developing' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                  'bg-slate-800 text-slate-400 border border-slate-700'
+                }`}>
+                  {data?.readinessDetails?.level || 'Beginner'}
+                </span>
+              </div>
+              <div className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">Placement Readiness</div>
+              {data?.readinessDetails?.summary && (
+                <div className="text-[11px] text-slate-300 max-w-xs text-left leading-tight">
+                  {data.readinessDetails.summary}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -90,8 +112,11 @@ export default function StudentDashboard() {
 
       {/* Main Grid: Roadmap & Modules Quick Launcher */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Personal Roadmap Engine (2 cols) */}
+        {/* Left Column: Smart Recommendations & Roadmap Engine (2 cols) */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Smart Recommendations Component */}
+          <SmartRecommendations />
+
           <div className="glass-panel p-5 rounded-2xl border border-slate-800/80 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -108,47 +133,74 @@ export default function StudentDashboard() {
             </div>
 
             <div className="space-y-3">
-              {(data?.roadmap || []).map((node, index) => (
+              {(data?.roadmapPreview || data?.roadmap || []).map((node, index) => (
                 <div 
                   key={node.nodeId || index} 
-                  className={`p-4 rounded-xl border transition-all flex items-center justify-between ${
+                  className={`p-4 rounded-xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 ${
                     node.status === 'in_progress'
                       ? 'bg-blue-950/20 border-blue-500/30 shadow-lg shadow-blue-500/5'
+                      : node.status === 'completed'
+                      ? 'bg-emerald-950/10 border-emerald-500/20 text-slate-300'
                       : 'bg-slate-900/40 border-slate-800 text-slate-400'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className={`h-9 w-9 rounded-xl flex items-center justify-center font-bold text-xs ${
+                  <div className="flex items-start gap-3">
+                    <div className={`h-9 w-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 ${
                       node.status === 'in_progress'
                         ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                        : node.status === 'completed'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                         : 'bg-slate-800 text-slate-500'
                     }`}>
-                      {index + 1}
+                      {node.status === 'completed' ? '✓' : index + 1}
                     </div>
-                    <div>
-                      <div className="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                    <div className="space-y-1">
+                      <div className="text-xs font-semibold text-slate-200 flex flex-wrap items-center gap-2">
                         <span>{node.title}</span>
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium uppercase ${
-                          node.category === 'dsa' ? 'bg-blue-500/10 text-blue-400' :
-                          node.category === 'aptitude' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-purple-500/10 text-purple-400'
+                          (node.category || 'dsa') === 'dsa' ? 'bg-blue-500/10 text-blue-400' :
+                          (node.category || 'dsa') === 'aptitude' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-purple-500/10 text-purple-400'
                         }`}>
-                          {node.category}
+                          {node.category || 'DSA'}
                         </span>
+                        {node.recommendedDifficulty && (
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-semibold border ${
+                            node.recommendedDifficulty === 'Easy' ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/30' :
+                            node.recommendedDifficulty === 'Hard' ? 'bg-rose-950/40 text-rose-300 border-rose-500/30' :
+                            'bg-amber-950/40 text-amber-300 border-amber-500/30'
+                          }`}>
+                            {node.recommendedDifficulty}
+                          </span>
+                        )}
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">
-                        Priority Score: {node.priorityScore}/10 • Estimated: 3 hrs
+
+                      <div className="text-[11px] text-slate-400 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                        <span>Priority Score: <strong className="text-slate-300">{node.priorityScore || 50}/100</strong></span>
+                        {node.recommendedActivity && (
+                          <span>Activity: <strong className="text-indigo-300">{node.recommendedActivity.replace(/_/g, ' ')}</strong></span>
+                        )}
                       </div>
+
+                      {node.adaptiveReason && (
+                        <p className="text-[11px] text-slate-300/90 leading-tight pt-0.5">
+                          {node.adaptiveReason}
+                        </p>
+                      )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
                     {node.status === 'in_progress' ? (
                       <button 
-                        onClick={() => navigate(node.category === 'dsa' ? '/dsa' : node.category === 'aptitude' ? '/aptitude' : '/cs-core')}
+                        onClick={() => navigate((node.category || 'dsa') === 'dsa' ? '/dsa' : (node.category || 'dsa') === 'aptitude' ? '/aptitude' : '/cs-core')}
                         className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-all shadow-md shadow-blue-600/20 cursor-pointer"
                       >
-                        Start Node
+                        Start Task
                       </button>
+                    ) : node.status === 'completed' ? (
+                      <span className="px-2.5 py-1 rounded text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        Mastered
+                      </span>
                     ) : (
                       <span className="p-2 text-slate-600">
                         <Lock className="h-4 w-4" />

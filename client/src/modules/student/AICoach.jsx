@@ -64,7 +64,7 @@ const FormattedMessage = ({ text }) => {
 
   const lines = text.split('\n');
   return (
-    <div className="space-y-1.5 font-sans leading-relaxed">
+    <div className="space-y-1.5 font-sans leading-relaxed text-slate-200">
       {lines.map((line, idx) => {
         const trimmed = line.trim();
         if (trimmed.startsWith('### ')) {
@@ -83,7 +83,7 @@ const FormattedMessage = ({ text }) => {
         }
         if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
           return (
-            <li key={idx} className="ml-4 list-disc text-xs text-gray-200">
+            <li key={idx} className="ml-4 list-disc text-xs text-slate-200">
               {renderBoldText(trimmed.substring(2))}
             </li>
           );
@@ -95,7 +95,7 @@ const FormattedMessage = ({ text }) => {
           return <div key={idx} className="h-1" />;
         }
         return (
-          <p key={idx} className="text-xs text-gray-200">
+          <p key={idx} className="text-xs text-slate-200">
             {renderBoldText(line)}
           </p>
         );
@@ -254,23 +254,23 @@ const AICoach = () => {
   };
 
   return (
-    <div className="h-[calc(100vh-130px)] flex flex-col glass-panel rounded-2xl border border-gray-800/90 overflow-hidden bg-[#0b0f19]">
+    <div className="h-[calc(100vh-130px)] flex flex-col glass-panel rounded-2xl border border-slate-800 overflow-hidden bg-[#0b0f19]">
       {/* Header Bar */}
-      <div className="p-4 border-b border-gray-800/80 bg-gray-900/60 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
+      <div className="p-4 border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 p-0.5 shadow-lg shadow-indigo-600/20 shrink-0">
-            <div className="w-full h-full bg-gray-950 rounded-[10px] flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 p-0.5 shadow-md shadow-indigo-600/20 shrink-0">
+            <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
               <Bot className="w-5 h-5 text-indigo-400" />
             </div>
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <h1 className="font-bold text-base text-white tracking-wide">My AI Coach</h1>
+              <h1 className="heading-section">My AI Coach</h1>
               <span className="px-2 py-0.5 text-[10px] font-mono rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300">
                 Context-Aware AI
               </span>
             </div>
-            <p className="text-xs text-gray-400">Personalized mentor powered by your MongoDB learning history and practice attempts.</p>
+            <p className="text-xs text-slate-400">Personalized mentor powered by your MongoDB learning history and practice attempts.</p>
           </div>
         </div>
 
@@ -279,10 +279,10 @@ const AICoach = () => {
           <button
             type="button"
             onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1.5 transition-all border ${
+            className={`btn-secondary text-xs px-3 py-1.5 cursor-pointer ${
               showAdvancedFilters || topicInput || difficultySelect
-                ? 'bg-indigo-600/20 border-indigo-500/40 text-indigo-300'
-                : 'bg-gray-800/60 border-gray-700/50 text-gray-400 hover:text-white hover:bg-gray-800'
+                ? 'border-indigo-500/40 text-indigo-300 bg-indigo-950/40'
+                : ''
             }`}
             title="Toggle optional Topic and Difficulty filters"
           >
@@ -297,7 +297,7 @@ const AICoach = () => {
             <button
               type="button"
               onClick={handleClearHistory}
-              className="p-1.5 rounded-xl bg-gray-800/60 border border-gray-700/50 text-gray-400 hover:text-rose-400 hover:bg-rose-950/30 transition-all"
+              className="btn-ghost p-1.5 hover:text-rose-400 hover:bg-rose-950/30 transition-all cursor-pointer"
               title="Clear current session chat history"
             >
               <RotateCcw className="w-3.5 h-3.5" />
@@ -307,9 +307,9 @@ const AICoach = () => {
       </div>
 
       {/* Module Selector & Context Toolbar */}
-      <div className="px-4 py-2.5 border-b border-gray-800/60 bg-gray-900/30 flex flex-col gap-2 shrink-0">
+      <div className="px-4 py-2.5 border-b border-slate-800/60 bg-slate-900/30 flex flex-col gap-2 shrink-0">
         <div className="flex items-center space-x-2 overflow-x-auto py-0.5 no-scrollbar">
-          <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider shrink-0 mr-1">Module:</span>
+          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider shrink-0 mr-1 font-mono">Module:</span>
           {MODULE_OPTIONS.map(mod => {
             const Icon = mod.icon;
             const isSelected = selectedModule === mod.id;
@@ -321,7 +321,7 @@ const AICoach = () => {
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-2 transition-all shrink-0 cursor-pointer ${
                   isSelected
                     ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 border border-indigo-500/50'
-                    : 'bg-gray-800/50 text-gray-400 hover:text-gray-200 hover:bg-gray-800 border border-gray-800'
+                    : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800'
                 }`}
               >
                 <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : mod.color}`} />
@@ -333,24 +333,24 @@ const AICoach = () => {
 
         {/* Optional Topic & Difficulty Bar */}
         {showAdvancedFilters && (
-          <div className="pt-2 border-t border-gray-800/40 flex flex-wrap items-center gap-3 text-xs">
+          <div className="pt-2 border-t border-slate-800/40 flex flex-wrap items-center gap-3 text-xs">
             <div className="flex items-center space-x-2 flex-1 min-w-[200px]">
-              <label className="text-gray-400 font-medium shrink-0">Topic:</label>
+              <label className="text-slate-400 font-medium shrink-0">Topic:</label>
               <input
                 type="text"
                 value={topicInput}
                 onChange={(e) => setTopicInput(e.target.value)}
                 placeholder="e.g. Binary Search, Operating Systems"
-                className="flex-1 px-3 py-1.5 rounded-lg bg-gray-900/90 border border-gray-800 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 text-xs"
+                className="input-standard py-1.5 text-xs"
               />
             </div>
 
             <div className="flex items-center space-x-2 shrink-0">
-              <label className="text-gray-400 font-medium shrink-0">Difficulty:</label>
+              <label className="text-slate-400 font-medium shrink-0">Difficulty:</label>
               <select
                 value={difficultySelect}
                 onChange={(e) => setDifficultySelect(e.target.value)}
-                className="px-3 py-1.5 rounded-lg bg-gray-900/90 border border-gray-800 text-white focus:outline-none focus:border-indigo-500 text-xs"
+                className="select-standard py-1.5 text-xs"
               >
                 {DIFFICULTY_OPTIONS.map(d => (
                   <option key={d.id} value={d.id}>{d.label}</option>
@@ -362,9 +362,9 @@ const AICoach = () => {
               <button
                 type="button"
                 onClick={() => { setTopicInput(''); setDifficultySelect(''); }}
-                className="text-[11px] text-gray-500 hover:text-indigo-400 underline"
+                className="text-[11px] text-slate-400 hover:text-indigo-400 underline cursor-pointer"
               >
-                Reset Context Filters
+                Reset Filters
               </button>
             )}
           </div>
@@ -376,13 +376,13 @@ const AICoach = () => {
         {/* Empty State before first message */}
         {messages.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center text-center max-w-xl mx-auto py-8">
-            <div className="w-16 h-16 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-4 shadow-xl shadow-indigo-600/10">
-              <Sparkles className="w-8 h-8" />
+            <div className="w-16 h-16 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-4 shadow-xl">
+              <Sparkles className="w-8 h-8 text-indigo-400" />
             </div>
 
-            <h2 className="text-lg font-bold text-white tracking-tight">How can I guide your placement prep today?</h2>
-            <p className="text-xs text-gray-400 mt-1 max-w-md">
-              Select a module above or choose one of the starter questions below. I extract your recent MongoDB test attempts to give exact personalized guidance.
+            <h2 className="heading-section">How can I guide your placement prep today?</h2>
+            <p className="text-xs text-slate-400 mt-1.5 max-w-md leading-relaxed">
+              Select a module above or choose one of the starter questions below. I analyze your recent test attempts to give exact personalized guidance.
             </p>
 
             {/* Starter Prompts Grid */}
@@ -392,12 +392,12 @@ const AICoach = () => {
                   key={i}
                   type="button"
                   onClick={() => handleStarterClick(starter)}
-                  className="p-3.5 rounded-xl glass-card border border-gray-800 hover:border-indigo-500/40 hover:bg-gray-800/40 transition-all text-xs flex items-start space-x-2.5 group cursor-pointer"
+                  className="p-3.5 rounded-xl glass-card border border-slate-800 hover:border-indigo-500/40 hover:bg-slate-800/40 transition-all text-xs flex items-start space-x-2.5 group cursor-pointer"
                 >
                   <Lightbulb className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-semibold text-gray-200 group-hover:text-indigo-300 transition-colors">"{starter.text}"</p>
-                    <span className="text-[10px] text-gray-500 uppercase tracking-wider font-mono mt-1 block">
+                    <p className="font-semibold text-slate-200 group-hover:text-indigo-300 transition-colors">"{starter.text}"</p>
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider font-mono mt-1 block">
                       Module: {starter.module}
                     </span>
                   </div>
@@ -422,7 +422,7 @@ const AICoach = () => {
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
                   : msg.sender === 'system_error'
                   ? 'bg-rose-950/80 border border-rose-500/40 text-rose-400'
-                  : 'bg-gradient-to-tr from-indigo-600 to-violet-600 text-white shadow-lg'
+                  : 'bg-gradient-to-tr from-indigo-600 to-violet-600 text-white shadow-md'
               }`}
             >
               {msg.sender === 'user' ? (
@@ -440,14 +440,14 @@ const AICoach = () => {
                 msg.sender === 'user'
                   ? 'bg-indigo-600/90 text-white rounded-tr-none shadow-md shadow-indigo-600/20'
                   : msg.sender === 'system_error'
-                  ? 'bg-rose-950/30 border border-rose-500/30 text-rose-200 rounded-tl-none'
-                  : 'glass-card border border-gray-800/90 text-gray-200 rounded-tl-none bg-gray-900/80'
+                  ? 'error-banner rounded-tl-none text-rose-200'
+                  : 'glass-card border border-slate-800 text-slate-200 rounded-tl-none bg-slate-900/90'
               }`}
             >
               {/* Persona / Role Badge for AI */}
               {msg.sender === 'ai' && (
-                <div className="flex items-center justify-between border-b border-gray-800/60 pb-2 mb-2">
-                  <span className="text-[10px] font-semibold text-indigo-400 uppercase tracking-wider flex items-center space-x-1">
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-2 mb-2">
+                  <span className="text-[10px] font-semibold text-indigo-400 uppercase tracking-wider flex items-center space-x-1 font-mono">
                     <Sparkles className="w-3 h-3 text-indigo-400" />
                     <span>{msg.module ? `${msg.module.toUpperCase()} Mentor` : 'AI Placement Coach'}</span>
                   </span>
@@ -455,7 +455,7 @@ const AICoach = () => {
                   <button
                     type="button"
                     onClick={() => handleCopyText(msg.text, idx)}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 hover:text-white rounded"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-slate-400 hover:text-white rounded"
                     title="Copy response text"
                   >
                     {copiedIdx === idx ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
@@ -476,7 +476,7 @@ const AICoach = () => {
 
               {/* Time Stamp */}
               {msg.timestamp && (
-                <div className={`text-[9px] opacity-50 text-right mt-1 font-mono ${msg.sender === 'user' ? 'text-indigo-200' : 'text-gray-400'}`}>
+                <div className={`text-[9px] opacity-50 text-right mt-1 font-mono ${msg.sender === 'user' ? 'text-indigo-200' : 'text-slate-400'}`}>
                   {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
               )}
@@ -490,7 +490,7 @@ const AICoach = () => {
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white flex items-center justify-center shrink-0 shadow-lg animate-pulse">
               <Bot className="w-4 h-4" />
             </div>
-            <div className="glass-card border border-gray-800/80 p-3.5 rounded-2xl rounded-tl-none bg-gray-900/80 flex items-center space-x-3 text-xs text-indigo-300 font-mono">
+            <div className="glass-card border border-slate-800 p-3.5 rounded-2xl rounded-tl-none bg-slate-900/90 flex items-center space-x-3 text-xs text-indigo-300 font-mono">
               <Loader2 className="w-4 h-4 animate-spin text-indigo-400 shrink-0" />
               <span>AI Coach is analyzing your context & generating response...</span>
             </div>
@@ -501,7 +501,7 @@ const AICoach = () => {
       </div>
 
       {/* Input Control Box */}
-      <form onSubmit={handleFormSubmit} className="p-3.5 border-t border-gray-800 bg-gray-900/50 backdrop-blur-md flex items-center space-x-3 shrink-0">
+      <form onSubmit={handleFormSubmit} className="p-3.5 border-t border-slate-800 bg-slate-900/60 backdrop-blur-md flex items-center space-x-3 shrink-0">
         <textarea
           ref={inputRef}
           value={inputMessage}
@@ -510,13 +510,13 @@ const AICoach = () => {
           rows={1}
           placeholder={`Ask your ${activeModuleObj.name} Coach... (Press Enter to send, Shift+Enter for new line)`}
           disabled={loading || errorStatus === 401}
-          className="flex-1 px-4 py-2.5 rounded-xl bg-gray-950/80 border border-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-xs resize-none max-h-24 disabled:opacity-50"
+          className="input-standard flex-1 py-2.5 resize-none max-h-24 disabled:opacity-50 text-xs"
         />
         <button
           type="submit"
           disabled={loading || !inputMessage.trim() || errorStatus === 401}
           aria-label="Send message to AI Coach"
-          className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-lg shadow-indigo-600/30 flex items-center space-x-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0"
+          className="btn-primary text-xs px-4 py-2.5 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         >
           <Send className="w-4 h-4" />
           <span className="hidden sm:inline">Send</span>
@@ -527,3 +527,4 @@ const AICoach = () => {
 };
 
 export default AICoach;
+

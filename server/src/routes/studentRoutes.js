@@ -13,6 +13,8 @@ import {
 import { protect } from '../middleware/authMiddleware.js';
 import { authorize } from '../middleware/roleMiddleware.js';
 
+import { getBaselineAssessment, submitBaselineAssessment } from '../controllers/assessmentController.js';
+
 const router = express.Router();
 
 router.use(protect);
@@ -28,5 +30,8 @@ router.get('/progress', getProgressMetrics);
 router.get('/weak-areas', getWeakAreas);
 router.get('/achievements', getAchievements);
 router.get('/recommendations', getRecommendations);
+
+router.get('/assessment/baseline', getBaselineAssessment);
+router.post('/assessment/baseline/submit', submitBaselineAssessment);
 
 export default router;

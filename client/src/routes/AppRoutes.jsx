@@ -15,6 +15,7 @@ import MyProgress from '../pages/student/MyProgress';
 import WeakAreas from '../pages/student/WeakAreas';
 import Achievements from '../pages/student/Achievements';
 import ProfileSettings from '../pages/student/ProfileSettings';
+import BaselineAssessment from '../pages/student/BaselineAssessment';
 
 // Admin Pages
 import AdminDashboard from '../pages/admin/AdminDashboard';
@@ -45,9 +46,13 @@ export default function AppRoutes() {
       <Route path="/company-prep" element={<CompanyPrep />} />
       <Route path="/resume-analyzer" element={<ResumeAnalyzer />} />
       <Route path="/my-progress" element={<MyProgress />} />
+      <Route path="/student/progress" element={<MyProgress />} />
       <Route path="/weak-areas" element={<WeakAreas />} />
+      <Route path="/student/weak-areas" element={<WeakAreas />} />
       <Route path="/achievements" element={<Achievements />} />
+      <Route path="/student/achievements" element={<Achievements />} />
       <Route path="/settings" element={<ProfileSettings />} />
+      <Route path="/assessment/baseline" element={<BaselineAssessment />} />
 
       {/* Admin Routes */}
       <Route path="/admin" element={<AdminDashboard />} />

@@ -6,7 +6,9 @@ const scripts = [
   'verifyRBAC.js',
   'verifyStudentProfile.js',
   'verifyStudentDashboard.js',
+  'verifyReadinessScore.js',
   'verifyStudentRoadmap.js',
+  'verifyAdaptiveRoadmap.js',
   'verifyStudentProgress.js',
   'verifyStudentWeakAreas.js',
   'verifyStudentAchievements.js',
@@ -14,6 +16,7 @@ const scripts = [
   'verifyDsaQuestions.js',
   'verifyDsaQuestionDetail.js',
   'verifyDsaSubmit.js',
+  'verifyDsaExecution.js',
   'verifyDsaAiHint.js',
   'verifyAptitudeTopics.js',
   'verifyAptitudeQuiz.js',
@@ -30,6 +33,11 @@ const scripts = [
   'verifyAiCoachRealGemini.js',
   'verifyRecommendations.js',
   'verifyRecommendationExplain.js',
+  'verifyBaselineAssessment.js',
+  'verifyAdminDashboard.js',
+  'verifyAdminQuestions.js',
+  'verifyAdminStudents.js',
+  'verifyAdminTopics.js',
   'verifyGeminiApi.js'
 ];
 

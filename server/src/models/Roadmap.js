@@ -5,7 +5,10 @@ const roadmapNodeSchema = new mongoose.Schema({
   topicId: { type: mongoose.Schema.Types.ObjectId, ref: 'Topic' },
   status: { type: String, enum: ['locked', 'in_progress', 'completed'], default: 'locked' },
   priorityScore: { type: Number, default: 0, min: 0, max: 100 },
-  estimatedHours: { type: Number, default: 0, min: 0 }
+  estimatedHours: { type: Number, default: 0, min: 0 },
+  recommendedActivity: { type: String, default: 'TARGETED_PRACTICE' },
+  recommendedDifficulty: { type: String, enum: ['Easy', 'Medium', 'Hard'], default: 'Medium' },
+  adaptiveReason: { type: String, default: '' }
 });
 
 const roadmapSchema = new mongoose.Schema({

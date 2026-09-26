@@ -22,7 +22,7 @@ const attemptTrackSchema = new mongoose.Schema({
   language: { type: String, default: 'javascript' },
   status: {
     type: String,
-    enum: ['Accepted', 'Wrong Answer', 'Time Limit Exceeded', 'Runtime Error', 'Compile Error'],
+    enum: ['Accepted', 'Wrong Answer', 'Time Limit Exceeded', 'Runtime Error', 'Compile Error', 'Compilation Error', 'Memory Limit Exceeded', 'Execution Error'],
     required: true,
   },
   passedTestCases: { type: Number, default: 0, min: 0 },

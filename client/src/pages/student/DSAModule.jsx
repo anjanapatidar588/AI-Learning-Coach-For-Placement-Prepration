@@ -52,20 +52,31 @@ You may assume that each input would have exactly one solution, and you may not 
     setRunning(true);
     try {
       const res = await API.post('/dsa/submit', {
-        questionId: 'q-dsa-1',
+        slug: 'two-sum',
         code,
         language: selectedLanguage
       });
-      setOutput(res.data.data);
+      if (res.data && res.data.success) {
+        setOutput(res.data.data);
+      } else {
+        setOutput({
+          status: res.data?.data?.status || 'Execution Error',
+          error: res.data?.message || 'Code execution service is currently unavailable. Please try again later.',
+          passedTestCases: 0,
+          totalTestCases: 0,
+          isUnavailable: true
+        });
+      }
       setActiveTab('output');
     } catch (err) {
+      const statusMsg = err.response?.data?.message || 'Code execution service is currently unavailable. Please try again later.';
+      const statusType = err.response?.data?.data?.status || (err.response?.status === 503 ? 'Service Unavailable' : 'Execution Error');
       setOutput({
-        status: 'Accepted',
-        passedTestCases: 3,
-        totalTestCases: 3,
-        executionTimeMs: 38,
-        memoryKb: 14200,
-        aiFeedbackSummary: 'All test cases passed! Space-time complexity: O(N) Time | O(N) Space.'
+        status: statusType,
+        error: statusMsg,
+        passedTestCases: 0,
+        totalTestCases: 0,
+        isUnavailable: true
       });
       setActiveTab('output');
     } finally {
@@ -206,26 +217,41 @@ You are currently using a **Hash Map** pattern.
                   <div className="text-slate-500 text-center py-10">Run code to view test case execution results.</div>
                 ) : (
                   <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20">
-                      <CheckCircle2 className="h-5 w-5" />
+                    <div className={`flex items-center gap-2 font-bold text-sm p-3 rounded-xl border ${
+                      output.status === 'Accepted'
+                        ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                        : output.status === 'Service Unavailable' || output.status === 'Execution Unavailable'
+                        ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+                        : 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+                    }`}>
+                      {output.status === 'Accepted' ? <CheckCircle2 className="h-5 w-5" /> : <X className="h-5 w-5" />}
                       <span>Submission Status: {output.status}</span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 text-[11px]">
                       <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800">
                         <div className="text-slate-400">Passed Test Cases</div>
-                        <div className="text-slate-100 font-bold text-sm mt-0.5">{output.passedTestCases} / {output.totalTestCases}</div>
+                        <div className="text-slate-100 font-bold text-sm mt-0.5">{output.passedTestCases || 0} / {output.totalTestCases || 0}</div>
                       </div>
                       <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800">
                         <div className="text-slate-400">Runtime</div>
-                        <div className="text-slate-100 font-bold text-sm mt-0.5">{output.executionTimeMs} ms</div>
+                        <div className="text-slate-100 font-bold text-sm mt-0.5">{output.executionTimeMs ? `${output.executionTimeMs} ms` : 'N/A'}</div>
                       </div>
                     </div>
 
-                    <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
-                      <div className="text-[10px] font-semibold text-purple-400 uppercase">AI Complexity Analysis</div>
-                      <p className="text-slate-300 text-xs">{output.aiFeedbackSummary}</p>
-                    </div>
+                    {output.error && (
+                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
+                        <div className="text-[10px] font-semibold text-rose-400 uppercase">Execution Output / Error</div>
+                        <pre className="text-rose-300 text-xs font-mono whitespace-pre-wrap">{output.error}</pre>
+                      </div>
+                    )}
+
+                    {output.aiFeedbackSummary && (
+                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
+                        <div className="text-[10px] font-semibold text-purple-400 uppercase">AI Complexity Analysis</div>
+                        <p className="text-slate-300 text-xs">{output.aiFeedbackSummary}</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -8,6 +8,8 @@ import User from '../models/User.js';
 import { generateAIResponse } from '../services/ai/geminiClient.js';
 import { PERSONA_PROMPTS } from '../services/ai/promptTemplates.js';
 import { generateRecommendations } from '../services/recommendationService.js';
+import { calculateReadinessScore } from '../services/readinessScoreService.js';
+import { adaptStudentRoadmap } from '../services/adaptiveRoadmapService.js';
 
 export const getStudentDashboard = async (req, res) => {
   try {
@@ -21,8 +23,33 @@ export const getStudentDashboard = async (req, res) => {
       profile = await LearnerProfile.create({ userId });
     }
 
-    let roadmap = await Roadmap.findOne({ userId });
-    const roadmapPreview = roadmap && roadmap.nodes ? roadmap.nodes.slice(0, 5) : null;
+    // Calculate deterministic Placement Readiness Score
+    const readinessDetails = await calculateReadinessScore(userId);
+
+    // Re-fetch updated profile to reflect synced scores
+    profile = await LearnerProfile.findOne({ userId }).select('-__v');
+
+    let roadmapPreview = null;
+    const existingRoadmap = await Roadmap.findOne({ userId });
+    const hasAttempts = await AttemptTrack.exists({ userId });
+
+    if (existingRoadmap || hasAttempts) {
+      const { roadmap: adaptiveRoadmap } = await adaptStudentRoadmap(userId, { forceRecalculate: false });
+      const roadmapNodes = adaptiveRoadmap?.nodes || [];
+      if (roadmapNodes.length > 0) {
+        roadmapPreview = roadmapNodes.slice(0, 5).map(node => ({
+          nodeId: node.nodeId,
+          title: node.topicId?.title || node.nodeId,
+          category: node.topicId?.category || 'dsa',
+          status: node.status,
+          priorityScore: node.priorityScore,
+          estimatedHours: node.estimatedHours,
+          recommendedActivity: node.recommendedActivity,
+          recommendedDifficulty: node.recommendedDifficulty,
+          adaptiveReason: node.adaptiveReason
+        }));
+      }
+    }
 
     const recentActivity = await AttemptTrack.find({ userId })
       .sort({ createdAt: -1 })
@@ -37,7 +64,8 @@ export const getStudentDashboard = async (req, res) => {
         user,
         profile,
         roadmapPreview,
-        readinessScore: profile.overallReadinessScore || 0,
+        readinessScore: readinessDetails.score,
+        readinessDetails,
         dailyGoal: null,
         recentActivity
       }
@@ -50,13 +78,27 @@ export const getStudentDashboard = async (req, res) => {
 export const getRoadmap = async (req, res) => {
   try {
     const userId = req.user.userId || req.user._id;
-    const roadmap = await Roadmap.findOne({ userId }).select('-__v');
-    
+
+    const existing = await Roadmap.findOne({ userId });
+    const hasAttempts = await AttemptTrack.exists({ userId });
+
+    if (!existing && !hasAttempts) {
+      return res.json({ success: true, data: null, message: 'No roadmap found' });
+    }
+
+    const { roadmap, adaptiveSummary } = await adaptStudentRoadmap(userId, { forceRecalculate: false });
+
     if (!roadmap) {
       return res.json({ success: true, data: null, message: 'No roadmap found' });
     }
-    
-    res.json({ success: true, data: roadmap });
+
+    res.json({
+      success: true,
+      data: {
+        ...roadmap,
+        adaptiveSummary
+      }
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -65,23 +107,16 @@ export const getRoadmap = async (req, res) => {
 export const recalculateRoadmap = async (req, res) => {
   try {
     const userId = req.user.userId || req.user._id;
-    
-    let roadmap = await Roadmap.findOne({ userId });
-    
-    if (!roadmap) {
-      roadmap = new Roadmap({ userId, nodes: [] });
-      roadmap.lastGeneratedAt = new Date();
-    } else {
-      roadmap.lastGeneratedAt = new Date();
-      roadmap.version += 1;
-    }
-    
-    await roadmap.save();
+
+    const { roadmap, adaptiveSummary } = await adaptStudentRoadmap(userId, { forceRecalculate: true });
 
     res.json({
       success: true,
       message: 'Roadmap recalculated successfully',
-      data: roadmap
+      data: {
+        ...roadmap,
+        adaptiveSummary
+      }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
