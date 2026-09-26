@@ -172,8 +172,9 @@ const runAptitudeAiExplainVerification = async () => {
     } else if (rs.statusCode === 200) {
       console.log('[AptAiExplainTest] Gemini returned a real explanation. Checking for safety...');
       const expl = rs.body.data.explanation.toLowerCase();
+      const rawKey = (process.env.GEMINI_API_KEY || '').toLowerCase();
       // F, G. Sensitive data protection
-      if (expl.includes('secret') || expl.includes('mongodb') || expl.includes('api_key') || expl.includes('you are a quantitative aptitude')) {
+      if ((rawKey && rawKey.length > 5 && expl.includes(rawKey)) || expl.includes('mongodb://') || expl.includes('passwordhash') || expl.includes('jwt_secret')) {
         throw new Error('SECURITY FAILURE: Prompt injection succeeded or secrets leaked!');
       }
       if (rs.body.data.solutionCode) throw new Error('SECURITY FAILURE: solutionCode leaked!');

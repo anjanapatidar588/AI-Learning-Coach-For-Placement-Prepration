@@ -40,9 +40,10 @@ export const generateAIResponse = async ({ persona, systemPrompt, userPrompt, co
 
   if (genAI) {
     const candidateModels = [
-      process.env.GEMINI_MODEL || 'gemini-3.8-flash',
+      process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite-preview',
+      'gemini-3.8-flash',
       'gemini-3-flash-preview',
-      'gemini-3.1-flash-lite-preview'
+      'gemini-3.1-pro-preview'
     ];
 
     let lastError = null;
@@ -60,8 +61,17 @@ export const generateAIResponse = async ({ persona, systemPrompt, userPrompt, co
         }
       } catch (error) {
         lastError = error;
-        // If high demand spike (503) or model unavailable (404), try next candidate model
-        if (error.message && (error.message.includes('503') || error.message.includes('high demand') || error.message.includes('not found'))) {
+        const errStr = (error.message || '').toLowerCase();
+        // If high demand spike (503), quota exceeded (429), or model unavailable (404/deprecated), try next candidate model
+        if (
+          errStr.includes('503') ||
+          errStr.includes('429') ||
+          errStr.includes('404') ||
+          errStr.includes('quota') ||
+          errStr.includes('not found') ||
+          errStr.includes('available') ||
+          errStr.includes('high demand')
+        ) {
           continue;
         }
         break;

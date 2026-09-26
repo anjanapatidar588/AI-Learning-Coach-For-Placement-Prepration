@@ -27,6 +27,7 @@ const scripts = [
   'verifyCompanyDetail.js',
   'verifyAiCoach.js',
   'verifyAiCoachContext.js',
+  'verifyAiCoachRealGemini.js',
   'verifyRecommendations.js',
   'verifyRecommendationExplain.js',
   'verifyGeminiApi.js'

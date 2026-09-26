@@ -40,11 +40,12 @@ export const chatWithCoach = async (req, res) => {
 
     // 5. Determine Persona
     let selectedPersona = 'Career Coach';
-    if (safeContext.module === 'dsa') {
+    const normModule = (safeContext.module || '').toLowerCase();
+    if (normModule === 'dsa') {
       selectedPersona = 'DSA Mentor';
-    } else if (safeContext.module === 'aptitude') {
+    } else if (normModule === 'aptitude') {
       selectedPersona = 'Aptitude Mentor';
-    } else if (safeContext.module === 'cs_core') {
+    } else if (normModule === 'cs_core') {
       selectedPersona = 'CS Core Mentor';
     }
     
