@@ -22,10 +22,12 @@ import {
   Target,
   X
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const StudentAssessmentTake = () => {
   const { assessmentId } = useParams();
   const navigate = useNavigate();
+  const { fetchProfile } = useAuth();
 
   const [assessment, setAssessment] = useState(null);
   const [questions, setQuestions] = useState([]);
@@ -69,7 +71,7 @@ const StudentAssessmentTake = () => {
         }
       } catch (err) {
         setError(err.response?.data?.message || err.message || 'Failed to load assessment');
-      } fontFinally: {
+      } finally {
         setLoading(false);
       }
     };
@@ -141,6 +143,11 @@ const StudentAssessmentTake = () => {
 
       if (res.data?.success && res.data?.data) {
         setResult(res.data.data);
+        try {
+          if (fetchProfile) await fetchProfile();
+        } catch (pErr) {
+          console.warn('Profile refresh after assessment submit:', pErr);
+        }
       } else {
         setError(res.data?.message || 'Assessment submission failed');
       }
@@ -317,6 +324,36 @@ const StudentAssessmentTake = () => {
             </div>
           </div>
 
+          {/* Knowledge Gaps Section */}
+          {knowledgeGaps && knowledgeGaps.length > 0 && (
+            <div className="p-6 rounded-2xl bg-white border border-slate-200/80 shadow-xs space-y-4">
+              <div className="flex items-center space-x-2 text-slate-900 font-bold text-sm">
+                <Target className="w-5 h-5 text-purple-600" />
+                <span>Identified Knowledge & Practice Gaps</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {knowledgeGaps.map((gap, gIdx) => (
+                  <div key={gIdx} className="p-4 rounded-xl bg-purple-50/60 border border-purple-100 space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-purple-950">{gap.topicName || 'General'}</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-purple-100 text-purple-700 border border-purple-200">
+                        {gap.gapType?.replace(/_/g, ' ') || 'GAP'}
+                      </span>
+                    </div>
+                    {gap.evidence && (
+                      <p className="text-[11px] text-slate-600 leading-snug">{gap.evidence}</p>
+                    )}
+                    {gap.recommendedAction && (
+                      <p className="text-[11px] text-purple-900 font-semibold pt-1">
+                        <strong>Action:</strong> {gap.recommendedAction}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* AI Qualitative Insights Section */}
           <div className="p-6 rounded-2xl bg-white border border-indigo-200 space-y-4 shadow-sm">
             <div className="flex items-center justify-between">
@@ -346,21 +383,31 @@ const StudentAssessmentTake = () => {
             ) : null}
           </div>
 
-          {/* Personalized Roadmap CTA */}
-          <div className="p-6 rounded-2xl bg-indigo-600 text-center space-y-4 shadow-lg text-white">
-            <h2 className="text-xl font-extrabold">Your Personalized Roadmap Is Ready!</h2>
-            <p className="text-xs text-indigo-100 max-w-lg mx-auto">
-              We have adapted your learning map, daily study sequence, and targeted practice items according to your exact performance.
+          {/* Personalized Roadmap & Dashboard CTAs */}
+          <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-indigo-900 via-indigo-800 to-purple-900 text-center space-y-5 shadow-xl text-white">
+            <h2 className="text-xl sm:text-2xl font-black tracking-tight">Your Personalized Roadmap & Dashboard Are Ready!</h2>
+            <p className="text-xs sm:text-sm text-indigo-200 max-w-xl mx-auto leading-relaxed">
+              We have adapted your technical roadmap, daily practice capacity, and target prep plan according to your assessment performance.
             </p>
 
-            <button
-              onClick={() => navigate('/student/roadmap')}
-              className="px-8 py-3 bg-white hover:bg-slate-50 text-indigo-900 rounded-xl font-bold text-xs shadow-md transition-all inline-flex items-center space-x-2"
-            >
-              <MapPin className="w-4 h-4 text-indigo-600" />
-              <span>View My Personalized Roadmap</span>
-              <ArrowRight className="w-4 h-4 text-indigo-600" />
-            </button>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
+              <button
+                onClick={() => navigate('/student/roadmap')}
+                className="w-full sm:w-auto px-8 py-3.5 bg-white hover:bg-slate-50 text-indigo-900 rounded-xl font-bold text-xs shadow-md transition-all inline-flex items-center justify-center space-x-2 cursor-pointer"
+              >
+                <MapPin className="w-4 h-4 text-indigo-600" />
+                <span>View My Personalized Roadmap</span>
+                <ArrowRight className="w-4 h-4 text-indigo-600" />
+              </button>
+
+              <button
+                onClick={() => navigate('/student/dashboard')}
+                className="w-full sm:w-auto px-7 py-3.5 bg-indigo-700/60 hover:bg-indigo-700 text-white border border-indigo-500/40 rounded-xl font-bold text-xs shadow-md transition-all inline-flex items-center justify-center space-x-2 cursor-pointer"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                <span>Go to Student Dashboard</span>
+              </button>
+            </div>
           </div>
 
         </div>

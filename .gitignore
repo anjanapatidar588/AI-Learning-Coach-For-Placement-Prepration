@@ -1,19 +1,14 @@
-<<<<<<< HEAD
-=======
 # Dependencies
 node_modules/
 .pnpm-store/
 
 # Environment variables & secrets
->>>>>>> cb85447 (chore: initialize project foundation)
 .env
 .env.local
 .env.*.local
-node_modules/
+
+# Build output
 dist/
-<<<<<<< HEAD
-.DS_Store
-=======
 build/
 *.log
 
@@ -22,4 +17,4 @@ build/
 Thumbs.db
 .vscode/
 .idea/
->>>>>>> cb85447 (chore: initialize project foundation)
+

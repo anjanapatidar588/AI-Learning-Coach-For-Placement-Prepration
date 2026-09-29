@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { connectDB } from './config/db.js';
 import { errorHandler } from './src/middleware/errorMiddleware.js';
+import { ensurePortAvailable } from './src/utils/portManager.js';
 
 import authRoutes from './src/routes/authRoutes.js';
 import studentRoutes from './src/routes/studentRoutes.js';
@@ -59,6 +60,38 @@ app.get('/api/v1/health', healthHandler);
 // Global Error Handler
 app.use(errorHandler);
 
-app.listen(PORT, () => {
+// Ensure port 5000 is available, stopping any stale instance of this project gracefully
+await ensurePortAvailable(PORT);
+
+const server = app.listen(PORT, () => {
   console.log(`[Server] AI Placement Coach Backend running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
 });
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`[Server] Port ${PORT} is already in use (EADDRINUSE). Ensure only one instance is running.`);
+    process.exit(1);
+  } else {
+    console.error('[Server] Fatal server error:', err);
+    process.exit(1);
+  }
+});
+
+// Graceful shutdown handling to prevent leaving stale Node processes holding port 5000
+const handleShutdown = (signal) => {
+  console.log(`\n[Server] Received ${signal}. Shutting down gracefully...`);
+  if (server && server.listening) {
+    server.closeIdleConnections?.();
+    server.close(() => {
+      console.log(`[Server] Port ${PORT} released cleanly.`);
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(0), 1500).unref();
+  } else {
+    process.exit(0);
+  }
+};
+
+process.on('SIGINT', () => handleShutdown('SIGINT'));
+process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+

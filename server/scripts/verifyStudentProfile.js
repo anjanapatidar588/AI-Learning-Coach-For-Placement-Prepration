@@ -34,9 +34,17 @@ const createMockReqRes = (headers = {}, body = {}, query = {}) => {
 };
 
 const runMiddleware = (middleware, req, res) => {
-  return new Promise((resolve) => {
-    middleware(req, res, () => resolve(true));
-    setTimeout(() => resolve(false), 10);
+  return new Promise(async (resolve) => {
+    const timer = setTimeout(() => resolve(false), 8000);
+    try {
+      await middleware(req, res, () => {
+        clearTimeout(timer);
+        resolve(true);
+      });
+    } catch {
+      clearTimeout(timer);
+      resolve(false);
+    }
   });
 };
 

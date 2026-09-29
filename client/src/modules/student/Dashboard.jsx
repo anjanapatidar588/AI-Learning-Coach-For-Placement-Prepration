@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import API from '../../services/api';
 import {
@@ -12,34 +12,37 @@ import {
   AlertTriangle,
   Award,
   ChevronRight,
-  ArrowUpRight,
-  Loader2,
-  MapPin,
-  CheckCircle2,
+  ArrowRight,
   Clock,
   Play,
-  Database,
-  Cpu,
-  Network,
-  BookX,
   RotateCcw,
   Bot,
   Terminal,
-  ArrowRight,
-  Layers
+  Layers,
+  CheckCircle2,
+  Calendar,
+  GraduationCap,
+  Building2,
+  BookX,
+  Bookmark,
+  ExternalLink,
+  HelpCircle,
+  BarChart3,
+  Cpu,
+  Database,
+  Network
 } from 'lucide-react';
-import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
-
-import SmartRecommendations from '../../components/student/SmartRecommendations';
 
 const StudentDashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState(null);
   const [readinessData, setReadinessData] = useState({
     score: 0,
     level: 'Beginner',
-    summary: 'Loading readiness score...',
+    summary: 'Complete your initial assessment to calculate your placement readiness score.',
     breakdown: { dsa: 0, aptitude: 0, csCore: 0, consistency: 0, weaknessImpact: 0 }
   });
 
@@ -51,392 +54,804 @@ const StudentDashboard = () => {
     try {
       setLoading(true);
       const res = await API.get('/student/dashboard');
-      if (res.data && res.data.success) {
+      if (res.data?.success && res.data?.data) {
         const d = res.data.data;
         setDashboardData(d);
         const details = d.readinessDetails || {};
         setReadinessData({
           score: typeof details.score === 'number' ? details.score : (d.readinessScore || 0),
           level: details.level || 'Beginner',
-          summary: details.summary || 'Complete practice problems to calculate your deterministic readiness score.',
+          summary: details.summary || 'Based on your latest assessment and practice activity.',
           breakdown: details.breakdown || { dsa: 0, aptitude: 0, csCore: 0, consistency: 0, weaknessImpact: 0 }
         });
       }
     } catch (err) {
-      setReadinessData(prev => ({
-        ...prev,
-        summary: 'Unable to calculate readiness score at this time.'
-      }));
+      console.error('Failed to load student dashboard:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const currentRoadmapItem = dashboardData?.currentRoadmapItem;
-  const roadmapProgressPercent = dashboardData?.roadmapProgressPercent || 0;
-  const strongAreas = dashboardData?.strongAreas || [];
-  const weakAreas = dashboardData?.weakAreas || [];
-  const assessmentStatus = dashboardData?.assessmentStatus;
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
 
-  // Subjects for Learning Map Grid
-  const subjectList = [
-    { name: 'Data Structures & Algorithms', key: 'dsa', icon: Code2, path: '/student/dsa', progress: 75, color: 'bg-indigo-50 border-indigo-200 text-indigo-700' },
-    { name: 'Quantitative Aptitude', key: 'aptitude', icon: BrainCircuit, path: '/student/aptitude', progress: 82, color: 'bg-amber-50 border-amber-200 text-amber-700' },
-    { name: 'Database Management (DBMS)', key: 'dbms', icon: Database, path: '/student/cs-core', progress: 68, color: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
-    { name: 'Object-Oriented Programming (OOPS)', key: 'oops', icon: Layers, path: '/student/cs-core', progress: 70, color: 'bg-purple-50 border-purple-200 text-purple-700' },
-    { name: 'Operating Systems (OS)', key: 'os', icon: Cpu, path: '/student/cs-core', progress: 60, color: 'bg-rose-50 border-rose-200 text-rose-700' },
-    { name: 'Computer Networks (CN)', key: 'cn', icon: Network, path: '/student/cs-core', progress: 64, color: 'bg-sky-50 border-sky-200 text-sky-700' },
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[70vh] space-y-4">
+        <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm font-semibold text-indigo-700">Loading your personalized placement dashboard...</p>
+      </div>
+    );
+  }
+
+  const profile = dashboardData?.profile;
+  const studentUser = dashboardData?.user || user;
+  const currentRoadmapItem = dashboardData?.currentRoadmapItem;
+  const roadmapPreview = dashboardData?.roadmapPreview || [];
+  const roadmapProgressPercent = dashboardData?.roadmapProgressPercent || 0;
+  const latestAnalysis = dashboardData?.latestAnalysis;
+  const assessmentStatus = dashboardData?.assessmentStatus;
+  const hasAssessment = Boolean(assessmentStatus?.completed || latestAnalysis);
+
+  // Subject Performance normalization from real DB data
+  const rawSubjectPerformance = latestAnalysis?.subjectPerformance || {};
+  const subjectDisplayList = [
+    { key: 'dsa', label: 'DSA', icon: Code2, color: 'bg-indigo-600', textCol: 'text-indigo-600' },
+    { key: 'aptitude', label: 'Aptitude', icon: BrainCircuit, color: 'bg-emerald-600', textCol: 'text-emerald-600' },
+    { key: 'dbms', label: 'DBMS', icon: Database, color: 'bg-blue-600', textCol: 'text-blue-600' },
+    { key: 'oops', label: 'OOPS', icon: Layers, color: 'bg-purple-600', textCol: 'text-purple-600' },
+    { key: 'os', label: 'OS', icon: Cpu, color: 'bg-rose-600', textCol: 'text-rose-600' },
+    { key: 'cn', label: 'CN', icon: Network, color: 'bg-amber-600', textCol: 'text-amber-600' },
   ];
 
+  const strongTopics = latestAnalysis?.strongTopics || [];
+  const weakTopics = latestAnalysis?.weakTopics || [];
+  const knowledgeGaps = latestAnalysis?.knowledgeGaps || [];
+
+  // Format Target Date
+  let targetDateDisplay = 'Flexible Schedule';
+  if (profile?.targetDate) {
+    try {
+      const d = new Date(profile.targetDate);
+      if (!isNaN(d.getTime())) {
+        targetDateDisplay = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      }
+    } catch {}
+  }
+
+  // Circular progress calculations for Readiness Score
+  const radius = 48;
+  const circumference = 2 * Math.PI * radius;
+  const readinessOffset = circumference - (readinessData.score / 100) * circumference;
+
   return (
-    <div className="space-y-8">
-      {/* 1. TOP WELCOME & HERO "YOUR NEXT STEP" CARD */}
-      <div className="space-y-4">
-        <div>
-          <h1 className="heading-page">
-            Good morning, {user?.name || 'Student'} 👋
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Let's make progress today.
-          </p>
-        </div>
+    <div className="space-y-8 max-w-7xl mx-auto pb-12">
 
-        {/* Large Primary Card: Your Next Step */}
-        <div className="bg-white p-6 lg:p-8 rounded-2xl border border-slate-200/80 shadow-md relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-50/60 rounded-full blur-3xl pointer-events-none" />
+      {/* 1. HEADER SECTION */}
+      <div className="bg-white p-6 lg:p-8 rounded-3xl border border-slate-200/80 shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-indigo-100/50 via-purple-50/30 to-transparent rounded-full blur-3xl pointer-events-none" />
 
-          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-            <div className="space-y-3 flex-1">
-              <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold font-mono">
-                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                <span>YOUR NEXT STEP</span>
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              {getGreeting()}, {studentUser?.name || 'Student'} 👋
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-600">
+              Here's your placement preparation overview.
+            </p>
+
+            {/* Profile Context Metadata Bar */}
+            <div className="pt-2 flex flex-wrap items-center gap-2.5 sm:gap-3 text-xs">
+              <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 font-semibold">
+                <Target className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                <span className="font-bold text-slate-900">{profile?.targetRoles?.[0] || studentUser?.targetRole || 'Software Engineer'}</span>
               </div>
 
-              {currentRoadmapItem ? (
-                <>
-                  <h2 className="text-xl sm:text-2xl font-black text-slate-900">
-                    {currentRoadmapItem.topicName || currentRoadmapItem.title}
-                  </h2>
-                  <p className="text-xs sm:text-sm text-slate-600 max-w-2xl leading-relaxed">
-                    <strong className="text-slate-900 font-bold">Why recommended: </strong>
-                    {currentRoadmapItem.reason || currentRoadmapItem.adaptiveReason || 'Recommended next topic based on your baseline assessment analysis.'}
-                  </p>
-
-                  <div className="flex items-center space-x-4 text-xs font-semibold text-slate-500 pt-1">
-                    <span className="flex items-center space-x-1">
-                      <Clock className="w-4 h-4 text-indigo-600" />
-                      <span>Est. Time: 25 mins</span>
-                    </span>
-                    <span>•</span>
-                    <span className="flex items-center space-x-1">
-                      <MapPin className="w-4 h-4 text-indigo-600" />
-                      <span>Roadmap Node #{currentRoadmapItem.nodeOrder || 1}</span>
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <h2 className="text-xl font-bold text-slate-900">Continue Placement Roadmap</h2>
-                  <p className="text-xs text-slate-600">
-                    Take your baseline assessment or continue practice problems to unlock personalized topic recommendations.
-                  </p>
-                </>
-              )}
-
-              <div className="pt-2 flex flex-wrap items-center gap-3">
-                <Link
-                  to={currentRoadmapItem?.topicId ? `/student/learn/${currentRoadmapItem.topicId._id || currentRoadmapItem.topicId}` : '/student/roadmap'}
-                  className="btn-primary text-xs px-5 py-2.5 flex items-center space-x-2"
-                >
-                  <Play className="w-4 h-4 fill-white" />
-                  <span>Continue Learning</span>
-                </Link>
-
-                <Link
-                  to="/student/roadmap"
-                  className="btn-secondary text-xs px-4 py-2.5 flex items-center space-x-1.5"
-                >
-                  <span>View Roadmap</span>
-                  <ChevronRight className="w-4 h-4" />
-                </Link>
+              <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 font-semibold">
+                <Building2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                <span>{profile?.college || 'University Student'}</span>
               </div>
+
+              <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 font-semibold">
+                <GraduationCap className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                <span>Class of {profile?.graduationYear || new Date().getFullYear()}</span>
+              </div>
+
+              <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 font-semibold">
+                <Calendar className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                <span>Target: {targetDateDisplay}</span>
+              </div>
+
+              <Link
+                to="/student/profile"
+                className="text-indigo-600 hover:text-indigo-800 font-bold px-2 py-1 transition-colors flex items-center space-x-1 text-xs"
+              >
+                <span>Edit Profile</span>
+                <ChevronRight className="w-3 h-3" />
+              </Link>
             </div>
+          </div>
 
-            {/* Readiness Summary Badge Box */}
-            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 shrink-0 min-w-[260px] space-y-3 text-center lg:text-left">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Placement Readiness</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-50 border border-indigo-200 text-indigo-700">
-                  {readinessData.level}
+          {/* Quick AI Coach Button */}
+          <div className="shrink-0 self-start md:self-auto">
+            <Link
+              to="/student/ai-coach"
+              className="px-4 py-2.5 rounded-xl bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center space-x-2 transition-all shadow-xs"
+            >
+              <Bot className="w-4 h-4 text-indigo-600" />
+              <span>Ask AI Coach</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. READINESS OVERVIEW & ASSESSMENT PERFORMANCE ROW */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        {/* READINESS OVERVIEW (Col 1-5) */}
+        <div className="lg:col-span-5 bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-xs font-bold text-slate-400 font-mono tracking-wider uppercase">OVERVIEW</span>
+              <h2 className="text-lg font-black text-slate-900 mt-0.5">Placement Readiness</h2>
+            </div>
+            <span className="px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider bg-indigo-50 border border-indigo-200 text-indigo-700 font-mono">
+              {readinessData.level}
+            </span>
+          </div>
+
+          {/* Circular Gauge Display */}
+          <div className="flex items-center justify-center py-2">
+            <div className="relative flex items-center justify-center">
+              <svg className="w-40 h-40 transform -rotate-90">
+                <circle
+                  cx="80"
+                  cy="80"
+                  r={radius}
+                  stroke="#f1f5f9"
+                  strokeWidth="12"
+                  fill="transparent"
+                />
+                <circle
+                  cx="80"
+                  cy="80"
+                  r={radius}
+                  stroke="#4f46e5"
+                  strokeWidth="12"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={readinessOffset}
+                  strokeLinecap="round"
+                  fill="transparent"
+                  className="transition-all duration-1000 ease-out"
+                />
+              </svg>
+
+              <div className="absolute flex flex-col items-center justify-center text-center">
+                <span className="text-4xl font-black text-slate-900 tracking-tight">
+                  {readinessData.score}%
+                </span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">
+                  Readiness
                 </span>
               </div>
+            </div>
+          </div>
 
-              <div className="flex items-baseline space-x-2 justify-center lg:justify-start">
-                <span className="text-4xl font-black text-slate-900">{readinessData.score}%</span>
-                <span className="text-xs text-slate-500 font-medium">Overall Score</span>
+          {/* Explanation */}
+          <div className="text-center space-y-2">
+            <p className="text-xs text-slate-600 leading-relaxed max-w-sm mx-auto">
+              Based on your latest assessment and practice activity.
+            </p>
+
+            {/* Sub-breakdown pills */}
+            <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100">
+              <div className="p-2 rounded-xl bg-slate-50 text-center">
+                <div className="text-xs font-bold text-slate-900">{readinessData.breakdown?.dsa || 0}%</div>
+                <div className="text-[10px] text-slate-500 font-medium">DSA</div>
+              </div>
+              <div className="p-2 rounded-xl bg-slate-50 text-center">
+                <div className="text-xs font-bold text-slate-900">{readinessData.breakdown?.aptitude || 0}%</div>
+                <div className="text-[10px] text-slate-500 font-medium">Aptitude</div>
+              </div>
+              <div className="p-2 rounded-xl bg-slate-50 text-center">
+                <div className="text-xs font-bold text-slate-900">{readinessData.breakdown?.csCore || 0}%</div>
+                <div className="text-[10px] text-slate-500 font-medium">CS Core</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ASSESSMENT INSIGHT (Col 6-12) */}
+        <div className="lg:col-span-7 bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-6">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div>
+              <span className="text-xs font-bold text-slate-400 font-mono tracking-wider uppercase">DIAGNOSTIC METRICS</span>
+              <h2 className="text-lg font-black text-slate-900 mt-0.5">Your Assessment Performance</h2>
+            </div>
+
+            {hasAssessment && (
+              <Link
+                to="/student/assessment"
+                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center space-x-1"
+              >
+                <span>View Attempts</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+            )}
+          </div>
+
+          {hasAssessment ? (
+            <div className="space-y-6">
+              {/* Objective Metrics Grid (All 5 Authoritative Metrics) */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                <div className="p-3 rounded-2xl bg-indigo-50/70 border border-indigo-100 text-center space-y-0.5">
+                  <div className="text-[10px] font-bold text-indigo-600 uppercase font-mono">Score</div>
+                  <div className="text-lg sm:text-xl font-black text-indigo-950">
+                    {latestAnalysis?.overallPerformance?.obtainedMarks ?? (assessmentStatus?.score || 0)}
+                    <span className="text-[11px] text-indigo-400 font-semibold">/{latestAnalysis?.overallPerformance?.totalMarks || 10}</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-100 text-center space-y-0.5">
+                  <div className="text-[10px] font-bold text-emerald-600 uppercase font-mono">Accuracy</div>
+                  <div className="text-lg sm:text-xl font-black text-emerald-950">
+                    {latestAnalysis?.overallPerformance?.percentage ?? (assessmentStatus?.score || 0)}%
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-blue-50/70 border border-blue-100 text-center space-y-0.5">
+                  <div className="text-[10px] font-bold text-blue-600 uppercase font-mono">Attempted</div>
+                  <div className="text-lg sm:text-xl font-black text-blue-950">
+                    {latestAnalysis?.overallPerformance?.attempted ?? (latestAnalysis?.overallPerformance?.totalQuestions || '-')}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 text-center space-y-0.5">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase font-mono">Correct</div>
+                  <div className="text-lg sm:text-xl font-black text-emerald-600">
+                    {latestAnalysis?.overallPerformance?.correct ?? '-'}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 text-center space-y-0.5">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase font-mono">Incorrect</div>
+                  <div className="text-lg sm:text-xl font-black text-rose-600">
+                    {latestAnalysis?.overallPerformance?.incorrect ?? '-'}
+                  </div>
+                </div>
               </div>
 
-              <p className="text-[11px] text-slate-600 line-clamp-2 leading-snug">
-                {readinessData.summary}
+              {/* Subject-Wise Performance Breakdown */}
+              <div className="space-y-3">
+                <div className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                  <span>Subject Performance</span>
+                  <span className="text-slate-400 font-normal">Real objective accuracy</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {subjectDisplayList.map(subj => {
+                    const stat = rawSubjectPerformance[subj.key];
+                    const accuracy = typeof stat?.accuracy === 'number' ? stat.accuracy : null;
+                    if (accuracy === null && (!stat || stat.total === 0)) return null;
+
+                    const finalAcc = accuracy ?? 0;
+                    return (
+                      <div key={subj.key} className="p-3 rounded-xl bg-slate-50 border border-slate-100 space-y-1.5">
+                        <div className="flex items-center justify-between text-xs font-semibold">
+                          <span className="text-slate-800">{subj.label}</span>
+                          <span className={`font-mono font-bold ${subj.textCol}`}>{finalAcc}%</span>
+                        </div>
+                        <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                          <div
+                            className={`${subj.color} h-full rounded-full transition-all duration-500`}
+                            style={{ width: `${finalAcc}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* EMPTY STATE: NO ASSESSMENT COMPLETED YET */
+            <div className="p-8 rounded-2xl bg-indigo-50/40 border border-indigo-100 text-center space-y-4 my-auto">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-100 border border-indigo-200 flex items-center justify-center mx-auto text-indigo-600">
+                <BarChart3 className="w-6 h-6" />
+              </div>
+              <div className="space-y-1 max-w-md mx-auto">
+                <h3 className="text-base font-bold text-slate-900">No assessment completed yet</h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Complete your initial assessment to unlock your personalized analysis, identify topic gaps, and calibrate your readiness score.
+                </p>
+              </div>
+              <Link
+                to="/student/assessment-ready"
+                className="btn-primary text-xs px-6 py-2.5 inline-flex items-center space-x-2"
+              >
+                <span>Take Assessment Now</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          )}
+        </div>
+
+      </div>
+
+      {/* 3. STRONG TOPICS & FOCUS AREAS ROW */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        {/* STRONG TOPICS */}
+        <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
+              <h2 className="text-base font-black text-slate-900">Strong Topics</h2>
+            </div>
+            <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+              &ge;80% Accuracy
+            </span>
+          </div>
+
+          {strongTopics.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+              {strongTopics.map((st, idx) => (
+                <div
+                  key={idx}
+                  className="p-3.5 rounded-2xl bg-emerald-50/50 border border-emerald-100 flex items-center justify-between text-xs"
+                >
+                  <div className="flex items-center space-x-2">
+                    <span className="text-emerald-600 font-bold">✓</span>
+                    <span className="font-bold text-slate-900">{st.topicName || st}</span>
+                  </div>
+                  {st.accuracy && (
+                    <span className="font-mono font-bold text-emerald-700 text-[11px]">{st.accuracy}%</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 text-center space-y-2">
+              <p className="text-xs font-semibold text-slate-700">No strong topics cataloged yet</p>
+              <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+                {hasAssessment
+                  ? 'Keep practicing and solving problems to build high-accuracy strong topics.'
+                  : 'Take your diagnostic assessment to identify your current strong topics.'}
               </p>
             </div>
-          </div>
+          )}
         </div>
-      </div>
 
-      {/* 2. PREPARATION OVERVIEW STAT CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Stat 1: Placement Readiness */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-2">
+        {/* FOCUS AREAS (Weak / Critical topics) */}
+        <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase font-mono">Readiness Score</span>
-            <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600">
-              <Sparkles className="w-4 h-4" />
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600">
+                <AlertTriangle className="w-4 h-4" />
+              </div>
+              <h2 className="text-base font-black text-slate-900">Focus Areas</h2>
             </div>
+            <Link to="/student/weak-areas" className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center space-x-1">
+              <span>View All</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
-          <div className="text-2xl font-black text-slate-900">{readinessData.score}%</div>
-          <p className="text-[11px] text-slate-500">Based on baseline assessment & practice accuracy</p>
-        </div>
 
-        {/* Stat 2: Topics Completed */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase font-mono">Topics Completed</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-slate-900">
-            {dashboardData?.completedTopicsCount ?? 0} / {dashboardData?.totalTopicsCount ?? 0}
-          </div>
-          <p className="text-[11px] text-slate-500">{roadmapProgressPercent}% overall roadmap progress</p>
-        </div>
+          {weakTopics.length > 0 ? (
+            <div className="space-y-2.5 pt-1">
+              {weakTopics.slice(0, 3).map((wt, idx) => {
+                const wtName = wt.topicName || wt;
+                const matchingGap = knowledgeGaps.find(g => (g.topicName || '').toLowerCase() === String(wtName).toLowerCase());
+                const gapType = matchingGap?.gapType ? matchingGap.gapType.replace(/_/g, ' ') : (wt.classification === 'Critical' ? 'Critical Disconnect' : 'Pattern Gap');
+                const recommendedAction = matchingGap?.recommendedAction || 'Targeted pattern practice & concept reinforcement';
 
-        {/* Stat 3: Practice Progress */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase font-mono">Practice Solved</span>
-            <div className="w-8 h-8 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-center text-purple-600">
-              <Code2 className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-slate-900">
-            {dashboardData?.totalSolvedQuestions ?? 0} Questions
-          </div>
-          <p className="text-[11px] text-slate-500">Pattern-based problem attempts</p>
-        </div>
+                return (
+                  <div
+                    key={idx}
+                    className="p-3.5 rounded-2xl bg-rose-50/50 border border-rose-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-bold text-slate-900 text-sm">{wtName}</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-rose-100 text-rose-700 border border-rose-200">
+                          {gapType}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-600 flex flex-wrap items-center gap-1.5">
+                        <span className="font-semibold text-rose-700 font-mono">Performance: {wt.accuracy !== undefined ? `${wt.accuracy}%` : '<60%'}</span>
+                        <span>•</span>
+                        <span>{recommendedAction}</span>
+                      </div>
+                    </div>
 
-        {/* Stat 4: Revision Due */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase font-mono">Revision Due</span>
-            <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
-              <RotateCcw className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-slate-900">
-            {dashboardData?.dueRevisionCardsCount ?? 0} Cards
-          </div>
-          <p className="text-[11px] text-slate-500">Spaced repetition review items</p>
-        </div>
-      </div>
-
-      {/* 3. PROGRESS JOURNEY VISUALIZER */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="heading-section">Product Learning Journey</h3>
-            <p className="text-xs text-slate-500">Solved ≠ Understood. How your progress is verified.</p>
-          </div>
-          <span className="text-[10px] font-mono font-bold text-indigo-600 uppercase bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
-            Adaptive Pipeline
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 pt-2">
-          {[
-            { step: '1', title: 'Assessment', active: Boolean(assessmentStatus?.completed) },
-            { step: '2', title: 'Knowledge Gap', active: Boolean(weakAreas && weakAreas.length > 0) },
-            { step: '3', title: 'Learn', active: Boolean(currentRoadmapItem) },
-            { step: '4', title: 'Practice', active: Boolean(dashboardData?.totalSolvedQuestions > 0) },
-            { step: '5', title: 'Mistake Journal', active: Boolean(dashboardData?.unresolvedMistakesCount > 0) },
-            { step: '6', title: 'Revision', active: Boolean(dashboardData?.dueRevisionCardsCount > 0) },
-            { step: '7', title: 'Reassessment', active: Boolean(dashboardData?.reassessmentAvailable) },
-            { step: '8', title: 'Improvement', active: readinessData.score >= 70 }
-          ].map((pj, i) => (
-            <div key={i} className={`p-3 rounded-xl border text-center transition-all ${
-              pj.active
-                ? 'bg-indigo-50/80 border-indigo-200 text-indigo-900 font-bold'
-                : 'bg-slate-50 border-slate-200 text-slate-400 font-medium'
-            }`}>
-              <div className="text-[10px] font-mono text-slate-400 uppercase mb-0.5">Step {pj.step}</div>
-              <div className="text-xs truncate">{pj.title}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* 4. LEARNING MAP SUBJECT GRID */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="heading-section">Learning Map Subjects</h3>
-          <Link to="/student/roadmap" className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center space-x-1">
-            <span>Full Map</span>
-            <ChevronRight className="w-4 h-4" />
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {subjectList.map((subj) => {
-            const Icon = subj.icon;
-            return (
-              <Link
-                key={subj.key}
-                to={subj.path}
-                className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-indigo-300 transition-all block group"
-              >
-                <div className="flex items-center justify-between">
-                  <div className={`p-2.5 rounded-xl ${subj.color} border`}>
-                    <Icon className="w-5 h-5" />
+                    <Link
+                      to="/student/practice"
+                      className="self-start sm:self-auto px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-rose-700 border border-rose-200 font-bold text-xs shadow-2xs transition-colors shrink-0"
+                    >
+                      Target Topic →
+                    </Link>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 transition-colors" />
-                </div>
-
-                <h4 className="mt-4 font-bold text-sm text-slate-900 group-hover:text-indigo-600 transition-colors">
-                  {subj.name}
-                </h4>
-
-                <div className="mt-3 flex items-center justify-between text-xs text-indigo-600 font-medium">
-                  <span>Explore Curriculum</span>
-                  <span>→</span>
-                </div>
-              </Link>
-            );
-          })}
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 text-center space-y-2">
+              <CheckCircle2 className="w-6 h-6 text-emerald-500 mx-auto" />
+              <p className="text-xs font-semibold text-slate-700">No critical weaknesses detected</p>
+              <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+                Great job! Your recent evaluations show no immediate critical gaps.
+              </p>
+            </div>
+          )}
         </div>
+
       </div>
 
-      {/* 5. AI RECOMMENDATIONS & FOCUS AREAS */}
-      <SmartRecommendations />
+      {/* 4. PERSONALIZED ROADMAP & CONTINUE LEARNING ROW */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-      {/* FOCUS AREAS & RADAR */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Radar Chart */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-base text-slate-900 flex items-center space-x-2">
-                <TrendingUp className="w-4 h-4 text-indigo-600" />
-                <span>Skill Mastery Spectrum</span>
-              </h3>
-              <span className="text-xs text-slate-400 font-mono">Real-time</span>
+        {/* PERSONALIZED ROADMAP (Col 1-7) */}
+        <div className="lg:col-span-7 bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-sm space-y-5">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div>
+              <span className="text-xs font-bold text-slate-400 font-mono tracking-wider uppercase">LEARNING MAP</span>
+              <h2 className="text-lg font-black text-slate-900 mt-0.5">Placement Preparation Roadmap</h2>
             </div>
-            <p className="text-xs text-slate-500 mt-1">Multi-dimensional evaluation across technical placement domains.</p>
+            <Link
+              to="/student/roadmap"
+              className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center space-x-1"
+            >
+              <span>Full Roadmap</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
 
-          <div className="h-64 w-full mt-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart cx="50%" cy="50%" outerRadius="75%" data={[
-                { subject: 'DSA', score: readinessData.breakdown?.dsa || 0, fullMark: 100 },
-                { subject: 'Aptitude', score: readinessData.breakdown?.aptitude || 0, fullMark: 100 },
-                { subject: 'CS Core', score: readinessData.breakdown?.csCore || 0, fullMark: 100 },
-                { subject: 'Consistency', score: readinessData.breakdown?.consistency || 0, fullMark: 100 },
-              ]}>
-                <PolarGrid stroke="#e2e8f0" />
-                <PolarAngleAxis dataKey="subject" stroke="#64748b" tick={{ fill: '#475569', fontSize: 11, fontWeight: 600 }} />
-                <PolarRadiusAxis angle={30} domain={[0, 100]} stroke="#cbd5e1" />
-                <Radar name="Student Score" dataKey="score" stroke="#4f46e5" fill="#4f46e5" fillOpacity={0.25} />
-              </RadarChart>
-            </ResponsiveContainer>
+          {/* Progress Bar & Stats */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs font-semibold">
+              <span className="text-slate-700">Curriculum Completion</span>
+              <span className="text-indigo-600 font-bold font-mono">{roadmapProgressPercent}%</span>
+            </div>
+            <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+              <div
+                className="bg-indigo-600 h-full rounded-full transition-all duration-500"
+                style={{ width: `${roadmapProgressPercent}%` }}
+              />
+            </div>
           </div>
+
+          {/* Roadmap Key Metadata Chips */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+              <span className="text-[10px] text-slate-400 font-mono block uppercase">Current Topic</span>
+              <span className="font-bold text-slate-900 truncate block">
+                {currentRoadmapItem?.topicName || currentRoadmapItem?.title || 'None'}
+              </span>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+              <span className="text-[10px] text-slate-400 font-mono block uppercase">Next Recommended</span>
+              <span className="font-bold text-slate-900 truncate block">
+                {dashboardData?.nextRecommendedItem?.title || dashboardData?.nextRecommendedItem?.topicName || 'Keep sequence'}
+              </span>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+              <span className="text-[10px] text-slate-400 font-mono block uppercase">Target Date</span>
+              <span className="font-bold text-slate-900 truncate block">
+                {targetDateDisplay}
+              </span>
+            </div>
+          </div>
+
+          {/* Sequential Node Sequence Preview with [Completed], [Current], [Upcoming] badges */}
+          {roadmapPreview.length > 0 ? (
+            <div className="space-y-2.5 pt-1">
+              {roadmapPreview.map((node, idx) => {
+                const isCurrent = node.status === 'in_progress' || node.status === 'CURRENT';
+                const isCompleted = node.status === 'completed' || node.status === 'COMPLETED';
+
+                return (
+                  <div
+                    key={node.nodeId || idx}
+                    className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between text-xs ${
+                      isCurrent
+                        ? 'bg-indigo-50/70 border-indigo-300 shadow-2xs'
+                        : isCompleted
+                        ? 'bg-emerald-50/40 border-emerald-200'
+                        : 'bg-slate-50/60 border-slate-100'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <span className={`w-6 h-6 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${
+                        isCompleted
+                          ? 'bg-emerald-600 text-white'
+                          : isCurrent
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-slate-200 text-slate-600'
+                      }`}>
+                        {isCompleted ? '✓' : idx + 1}
+                      </span>
+                      <div>
+                        <div className="font-bold text-slate-900">{node.title}</div>
+                        <div className="text-[10px] text-slate-500 uppercase font-mono">{node.category}</div>
+                      </div>
+                    </div>
+
+                    <div>
+                      {isCompleted ? (
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          [Completed]
+                        </span>
+                      ) : isCurrent ? (
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 animate-pulse">
+                          [Current]
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                          [Upcoming]
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 text-center space-y-2">
+              <p className="text-xs font-semibold text-slate-700">Roadmap initializing</p>
+              <p className="text-[11px] text-slate-500">Complete an assessment to populate your sequential roadmap.</p>
+            </div>
+          )}
         </div>
 
-        {/* Focus Areas (Weak topics explanation) */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-4">
-          <div>
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-base text-slate-900 flex items-center space-x-2">
-                <AlertTriangle className="w-4 h-4 text-amber-600" />
-                <span>Knowledge Gap Focus Areas</span>
-              </h3>
-              <Link to="/student/weak-areas" className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center space-x-1">
-                <span>View All</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-            <p className="text-xs text-slate-500 mt-1">Targeted weak areas identified from baseline assessment.</p>
-          </div>
+        {/* CONTINUE LEARNING, DAILY PREPARATION & AI COACH (Col 8-12) */}
+        <div className="lg:col-span-5 space-y-6">
 
-          <div className="space-y-3">
-            {weakAreas.length > 0 ? (
-              weakAreas.slice(0, 3).map((wa, idx) => (
-                <div key={idx} className="p-4 rounded-xl bg-amber-50/70 border border-amber-200 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-bold text-amber-900">{wa.topicName || wa}</p>
-                    <p className="text-[11px] text-amber-800 mt-1 leading-snug">
-                      <span className="font-bold">Focus: </span>
-                      {wa.priority ? `Priority: ${wa.priority}` : 'Recommended review topic based on assessment analysis.'}
-                    </p>
-                  </div>
-                  <Link to="/student/roadmap" className="px-3 py-1.5 rounded-xl bg-amber-600 text-white text-xs font-bold shrink-0 hover:bg-amber-700 shadow-xs">
-                    Target
+          {/* CONTINUE LEARNING CARD */}
+          <div className="bg-gradient-to-br from-indigo-900 via-indigo-800 to-indigo-950 p-6 sm:p-7 rounded-3xl text-white shadow-md space-y-4 relative overflow-hidden">
+            <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-indigo-700/60 border border-indigo-500/40 text-[10px] font-bold font-mono tracking-wider uppercase text-indigo-200">
+              <Sparkles className="w-3 h-3 text-indigo-300" />
+              <span>CONTINUE LEARNING</span>
+            </div>
+
+            {currentRoadmapItem ? (
+              <div className="space-y-2">
+                <div className="text-[11px] text-indigo-300 font-mono uppercase font-bold">
+                  {currentRoadmapItem.category || 'DSA'} • {currentRoadmapItem.recommendedActivity || 'Pattern Recognition'}
+                </div>
+                <h3 className="text-xl font-black tracking-tight">
+                  {currentRoadmapItem.topicName || currentRoadmapItem.title}
+                </h3>
+                <p className="text-xs text-indigo-200 line-clamp-2 leading-relaxed">
+                  {currentRoadmapItem.reason || currentRoadmapItem.adaptiveReason || 'Recommended next topic on your personalized roadmap.'}
+                </p>
+
+                <div className="pt-2">
+                  <Link
+                    to={currentRoadmapItem.topicId ? `/student/learn/${currentRoadmapItem.topicId._id || currentRoadmapItem.topicId}` : '/student/roadmap'}
+                    className="w-full py-3 bg-white hover:bg-slate-50 text-indigo-900 font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center space-x-2"
+                  >
+                    <span>Continue Learning</span>
+                    <ArrowRight className="w-4 h-4 text-indigo-600" />
                   </Link>
                 </div>
-              ))
+              </div>
             ) : (
-              <div className="p-6 rounded-xl bg-slate-50 border border-slate-200 text-center space-y-2">
-                <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
-                <p className="text-xs font-bold text-slate-800">No Knowledge Gaps Detected</p>
-                <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
-                  Take your baseline assessment or solve practice questions to identify specific gaps.
+              <div className="space-y-3">
+                <h3 className="text-lg font-bold">Start Placement Journey</h3>
+                <p className="text-xs text-indigo-200">
+                  Select a topic from your roadmap or practice zone to start preparation.
                 </p>
+                <Link
+                  to="/student/roadmap"
+                  className="w-full py-2.5 bg-white text-indigo-900 font-bold text-xs rounded-xl inline-flex items-center justify-center space-x-2"
+                >
+                  <span>Explore Roadmap</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
               </div>
             )}
           </div>
+
+          {/* DAILY PREPARATION GOAL CARD */}
+          <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-xs font-bold text-slate-800">
+                <Clock className="w-4 h-4 text-indigo-600" />
+                <span>Daily Preparation Routine</span>
+              </div>
+              <span className="font-mono font-bold text-indigo-600 text-xs">
+                {profile?.dailyPreparationTime || '1–2 hours'}
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Target routine set during onboarding: <strong className="text-slate-900">{profile?.dailyPreparationTime || '1–2 hours'} daily</strong>.
+            </p>
+
+            <Link
+              to="/student/practice"
+              className="w-full py-2.5 rounded-xl btn-secondary text-xs font-bold flex items-center justify-center space-x-2"
+            >
+              <span>Start Today's Preparation</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          {/* AI COACH DEDICATED CARD */}
+          <div className="bg-white p-6 rounded-3xl border border-indigo-200/80 shadow-sm space-y-3 relative overflow-hidden">
+            <div className="flex items-center space-x-2 text-indigo-900 font-bold text-xs uppercase tracking-wider font-mono">
+              <Bot className="w-4 h-4 text-indigo-600" />
+              <span>AI Learning Coach</span>
+            </div>
+            <h3 className="text-base font-extrabold text-slate-900">
+              Need help deciding what to study next?
+            </h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Your AI Coach analyzes your real performance metrics, interview targets, and topic gaps to provide tailored study recommendations.
+            </p>
+            <div className="pt-1">
+              <Link
+                to="/student/ai-coach"
+                className="w-full py-2.5 rounded-xl btn-primary text-xs font-bold flex items-center justify-center space-x-2 shadow-sm"
+              >
+                <span>Ask AI Coach →</span>
+              </Link>
+            </div>
+          </div>
+
         </div>
+
       </div>
 
-      {/* 6. QUICK ACTIONS CARDS */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Link to="/student/practice" className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs hover:border-indigo-300 transition-all flex items-center space-x-3">
-          <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200">
-            <Terminal className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-xs font-bold text-slate-900">Practice Zone</div>
-            <div className="text-[10px] text-slate-500">Pattern practice</div>
-          </div>
-        </Link>
+      {/* 5. MISTAKE / REVISION / SAVED CONCEPTS & RECENT ACTIVITY */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-        <Link to="/student/mistakes" className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs hover:border-indigo-300 transition-all flex items-center space-x-3">
-          <div className="p-2.5 rounded-xl bg-rose-50 text-rose-600 border border-rose-200">
-            <BookX className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-xs font-bold text-slate-900">Mistake Journal</div>
-            <div className="text-[10px] text-slate-500">{dashboardData?.unresolvedMistakesCount || 0} unresolved</div>
-          </div>
-        </Link>
+        {/* MISTAKE / REVISION INSIGHTS (Col 1-5) */}
+        <div className="lg:col-span-5 bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
+          <h2 className="text-base font-black text-slate-900">Review & Retention Insights</h2>
+          <p className="text-xs text-slate-500">Strengthen retention through deliberate revision.</p>
 
-        <Link to="/student/revision" className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs hover:border-indigo-300 transition-all flex items-center space-x-3">
-          <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-200">
-            <RotateCcw className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-xs font-bold text-slate-900">Revision Center</div>
-            <div className="text-[10px] text-slate-500">{dashboardData?.dueRevisionCardsCount || 0} due cards</div>
-          </div>
-        </Link>
+          <div className="space-y-3 pt-1">
+            <Link
+              to="/student/mistakes"
+              className="p-4 rounded-2xl bg-rose-50/50 border border-rose-100 hover:border-rose-200 transition-all flex items-center justify-between text-xs group"
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold">
+                  <BookX className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-slate-900 group-hover:text-rose-700 transition-colors">Mistakes to Review</div>
+                  <div className="text-[11px] text-slate-500">Unresolved practice errors</div>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-base font-black text-rose-700 font-mono">
+                  {dashboardData?.unresolvedMistakesCount || 0}
+                </span>
+                <span className="text-[10px] text-slate-400 block font-medium">pending</span>
+              </div>
+            </Link>
 
-        <Link to="/student/ai-coach" className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs hover:border-indigo-300 transition-all flex items-center space-x-3">
-          <div className="p-2.5 rounded-xl bg-purple-50 text-purple-600 border border-purple-200">
-            <Bot className="w-5 h-5" />
+            <Link
+              to="/student/revision"
+              className="p-4 rounded-2xl bg-amber-50/50 border border-amber-100 hover:border-amber-200 transition-all flex items-center justify-between text-xs group"
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                  <RotateCcw className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-slate-900 group-hover:text-amber-700 transition-colors">Revision Due</div>
+                  <div className="text-[11px] text-slate-500">Spaced repetition review cards</div>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-base font-black text-amber-700 font-mono">
+                  {dashboardData?.dueRevisionCardsCount || 0}
+                </span>
+                <span className="text-[10px] text-slate-400 block font-medium">due cards</span>
+              </div>
+            </Link>
+
+            <Link
+              to="/student/revision"
+              className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100 hover:border-indigo-200 transition-all flex items-center justify-between text-xs group"
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                  <Bookmark className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-slate-900 group-hover:text-indigo-700 transition-colors">Saved Concepts</div>
+                  <div className="text-[11px] text-slate-500">Bookmarked explanations & notes</div>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-base font-black text-indigo-700 font-mono">
+                  {dashboardData?.savedConceptsCount || 0}
+                </span>
+                <span className="text-[10px] text-slate-400 block font-medium">saved</span>
+              </div>
+            </Link>
           </div>
-          <div>
-            <div className="text-xs font-bold text-slate-900">AI Coach</div>
-            <div className="text-[10px] text-slate-500">24/7 AI mentor</div>
+        </div>
+
+        {/* RECENT ACTIVITY (Col 6-12) */}
+        <div className="lg:col-span-7 bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-sm space-y-4 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-black text-slate-900">Recent Activity</h2>
+              <p className="text-xs text-slate-500">Your latest practice attempts & test sessions.</p>
+            </div>
+            <Link to="/student/progress" className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center space-x-1">
+              <span>All History</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
-        </Link>
+
+          {Array.isArray(dashboardData?.recentActivity) && dashboardData.recentActivity.length > 0 ? (
+            <div className="space-y-2.5 pt-1">
+              {dashboardData.recentActivity.slice(0, 4).map((act, aIdx) => {
+                const isAccepted = act.status === 'Accepted';
+                const questionTitle = act.questionId?.title || act.category?.toUpperCase() || 'Practice Problem';
+                let timeAgo = 'Recently';
+                if (act.createdAt) {
+                  try {
+                    const diff = Math.floor((Date.now() - new Date(act.createdAt).getTime()) / 60000);
+                    if (diff < 60) timeAgo = `${Math.max(1, diff)}m ago`;
+                    else if (diff < 1440) timeAgo = `${Math.floor(diff / 60)}h ago`;
+                    else timeAgo = `${Math.floor(diff / 1440)}d ago`;
+                  } catch {}
+                }
+
+                return (
+                  <div
+                    key={act._id || aIdx}
+                    className="p-3.5 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center justify-between text-xs"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <span className={`w-2.5 h-2.5 rounded-full ${isAccepted ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                      <div>
+                        <div className="font-bold text-slate-900 truncate max-w-xs sm:max-w-md">{questionTitle}</div>
+                        <div className="text-[10px] text-slate-400 capitalize">{act.category || 'DSA'} • {act.status}</div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-mono shrink-0">{timeAgo}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-8 rounded-2xl bg-slate-50 border border-slate-100 text-center space-y-2 my-auto">
+              <Clock className="w-6 h-6 text-slate-400 mx-auto" />
+              <p className="text-xs font-semibold text-slate-700">No activity recorded yet</p>
+              <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                Your activity will appear here as you start learning and attempting practice questions.
+              </p>
+            </div>
+          )}
+
+          {/* Quick Practice CTA at bottom */}
+          <div className="pt-2">
+            <Link
+              to="/student/practice"
+              className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center space-x-1.5"
+            >
+              <Terminal className="w-4 h-4" />
+              <span>Open Interactive Practice Workspace →</span>
+            </Link>
+          </div>
+        </div>
+
       </div>
 
     </div>

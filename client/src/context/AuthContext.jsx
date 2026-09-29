@@ -27,7 +27,9 @@ export const AuthProvider = ({ children }) => {
           setUser(authUser);
           localStorage.setItem('user', JSON.stringify(authUser));
 
-          if (authUser.role === 'student') {
+          if (res.data?.profile) {
+            setProfile(res.data.profile);
+          } else if (authUser.role === 'student') {
             await fetchProfile();
           }
         } else {
@@ -75,12 +77,17 @@ export const AuthProvider = ({ children }) => {
         setToken(tokenStr);
         setUser(userObj);
 
+        let userProfile = data.profile || null;
         if (userObj.role === 'student') {
-          await fetchProfile();
+          if (!userProfile) {
+            userProfile = await fetchProfile();
+          } else {
+            setProfile(userProfile);
+          }
         }
 
         setLoading(false);
-        return { success: true, user: userObj, token: tokenStr };
+        return { success: true, user: userObj, token: tokenStr, profile: userProfile };
       }
 
       setLoading(false);
@@ -120,6 +127,7 @@ export const AuthProvider = ({ children }) => {
 
       if (data?.success && data?.user) {
         const { token: tokenStr, user: userObj } = data;
+        let userProfile = data.profile || null;
 
         if (tokenStr) {
           localStorage.setItem('token', tokenStr);
@@ -127,12 +135,16 @@ export const AuthProvider = ({ children }) => {
           setToken(tokenStr);
           setUser(userObj);
           if (userObj.role === 'student') {
-            await fetchProfile();
+            if (!userProfile) {
+              userProfile = await fetchProfile();
+            } else {
+              setProfile(userProfile);
+            }
           }
         }
 
         setLoading(false);
-        return { success: true, user: userObj, token: tokenStr };
+        return { success: true, user: userObj, token: tokenStr, profile: userProfile };
       }
 
       setLoading(false);

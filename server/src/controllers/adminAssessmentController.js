@@ -137,7 +137,7 @@ export const createAdminAssessmentBlueprint = async (req, res) => {
       if (sumCount !== qCount) {
         return res.status(400).json({
           success: false,
-          message: `Question distribution (${sumCount}) must equal total question count (${qCount})`
+          message: `Question distribution (${sumCount}) must equal blueprint question count (${qCount})`
         });
       }
     }

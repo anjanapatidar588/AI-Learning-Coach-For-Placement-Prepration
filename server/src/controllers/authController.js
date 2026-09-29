@@ -65,22 +65,15 @@ export const signupUser = async (req, res) => {
     });
 
     // 7. Initialize learner assets for students only
+    let studentProfile = null;
     if (assignedRole === 'student') {
-      await LearnerProfile.create({ userId: user._id }).catch(() => {});
-      await Roadmap.create({
-        userId: user._id,
-        nodes: [
-          { nodeId: 'node-1', title: 'Arrays & Two Pointers', category: 'dsa', status: 'in_progress', priorityScore: 10, estimatedHours: 4, description: 'Master array traversals, sliding window, and two pointer techniques.' },
-          { nodeId: 'node-2', title: 'Quantitative Aptitude (Percentages & Profit/Loss)', category: 'aptitude', status: 'in_progress', priorityScore: 9, estimatedHours: 3, description: 'Core numerical techniques for online screening tests.' },
-          { nodeId: 'node-3', title: 'DBMS Fundamentals & SQL', category: 'cs_core', status: 'locked', priorityScore: 8, estimatedHours: 5, description: 'Relational algebra, SQL queries, B-Trees, and Normalization.' }
-        ]
-      }).catch(() => {});
+      studentProfile = await LearnerProfile.create({ userId: user._id }).catch(() => null);
     }
 
-    // 7. Generate JWT token for immediate authenticated session
+    // 8. Generate JWT token for immediate authenticated session
     const token = generateToken({ id: user._id, role: user.role });
 
-    // 8. Safe Response (Never exposing password or passwordHash)
+    // 9. Safe Response (Never exposing password or passwordHash)
     return res.status(201).json({
       success: true,
       token,
@@ -93,6 +86,7 @@ export const signupUser = async (req, res) => {
         targetRole: user.targetRole,
         createdAt: user.createdAt,
       },
+      profile: studentProfile
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -136,6 +130,10 @@ export const loginUser = async (req, res) => {
     // 5. JWT Token Generation via existing jwtUtil
     const token = generateToken({ id: user._id, role: user.role });
 
+    const profile = user.role === 'student'
+      ? await LearnerProfile.findOne({ userId: user._id }).select('-__v').lean()
+      : null;
+
     // 6. Safe Response (Exposing JWT, ID, Name, Email, Role; Never exposing password/passwordHash)
     return res.json({
       success: true,
@@ -148,6 +146,7 @@ export const loginUser = async (req, res) => {
         targetCompanies: user.targetCompanies,
         targetRole: user.targetRole,
       },
+      profile
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -162,6 +161,10 @@ export const getMe = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
+    const profile = user.role === 'student'
+      ? await LearnerProfile.findOne({ userId: user._id }).select('-__v').lean()
+      : null;
+
     return res.json({
       success: true,
       user: {
@@ -174,6 +177,7 @@ export const getMe = async (req, res) => {
         avatar: user.avatar,
         createdAt: user.createdAt,
       },
+      profile
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Server error' });

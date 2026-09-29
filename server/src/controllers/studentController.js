@@ -3,6 +3,7 @@ import Roadmap from '../models/Roadmap.js';
 import AttemptTrack from '../models/AttemptTrack.js';
 import WeaknessAnalysis from '../models/WeaknessAnalysis.js';
 import AssessmentAnalysis from '../models/AssessmentAnalysis.js';
+import AssessmentAttempt from '../models/AssessmentAttempt.js';
 import Achievement from '../models/Achievement.js';
 import Question from '../models/Question.js';
 import User from '../models/User.js';
@@ -14,6 +15,7 @@ import { adaptStudentRoadmap } from '../services/adaptiveRoadmapService.js';
 
 import MistakeJournal from '../models/MistakeJournal.js';
 import RevisionCard from '../models/RevisionCard.js';
+import SavedConcept from '../models/SavedConcept.js';
 
 export const getStudentDashboard = async (req, res) => {
   try {
@@ -47,8 +49,31 @@ export const getStudentDashboard = async (req, res) => {
 
     const existingRoadmap = await Roadmap.findOne({ userId });
     const hasAttempts = await AttemptTrack.exists({ userId });
-    const latestAnalysis = await AssessmentAnalysis.findOne({ studentId: userId }).sort({ generatedAt: -1 }).lean().catch(() => null);
+    let latestAnalysis = await AssessmentAnalysis.findOne({ studentId: userId }).sort({ generatedAt: -1 }).lean().catch(() => null);
+    if (!latestAnalysis) {
+      const latestAttempt = await AssessmentAttempt.findOne({ studentId: userId, status: 'COMPLETED' }).sort({ submittedAt: -1 }).lean().catch(() => null);
+      if (latestAttempt) {
+        latestAnalysis = {
+          overallPerformance: {
+            totalQuestions: latestAttempt.totalQuestions,
+            attempted: latestAttempt.attemptedQuestions,
+            correct: latestAttempt.correctAnswers,
+            incorrect: latestAttempt.incorrectAnswers,
+            unanswered: latestAttempt.unansweredQuestions,
+            totalMarks: latestAttempt.totalMarks,
+            obtainedMarks: latestAttempt.obtainedMarks,
+            percentage: latestAttempt.percentage
+          },
+          subjectPerformance: latestAttempt.subjectPerformance,
+          topicPerformance: latestAttempt.topicPerformance,
+          strongTopics: [],
+          weakTopics: [],
+          knowledgeGaps: []
+        };
+      }
+    }
 
+    let nextRecommendedItem = null;
     let completedTopicsCount = 0;
     let totalTopicsCount = 0;
 
@@ -59,6 +84,7 @@ export const getStudentDashboard = async (req, res) => {
       if (roadmapNodes.length > 0) {
         roadmapPreview = roadmapNodes.slice(0, 5).map(node => ({
           nodeId: node.nodeId,
+          topicId: node.topicId?._id || node.topicId || null,
           title: node.topicName || node.topicId?.title || node.nodeId,
           category: node.subject || node.topicId?.category || 'dsa',
           status: node.status,
@@ -72,6 +98,24 @@ export const getStudentDashboard = async (req, res) => {
         }));
 
         currentRoadmapItem = adaptiveSummary?.currentLearningItem || roadmapPreview.find(n => ['in_progress', 'CURRENT'].includes(n.status)) || roadmapPreview[0];
+        
+        // Determine Next Recommended Topic
+        const currentIdx = roadmapNodes.findIndex(n => n.nodeId === currentRoadmapItem?.nodeId);
+        const nextNode = (currentIdx !== -1 && currentIdx + 1 < roadmapNodes.length)
+          ? roadmapNodes[currentIdx + 1]
+          : roadmapNodes.find(n => !['completed', 'COMPLETED', 'in_progress', 'CURRENT'].includes(n.status));
+
+        if (nextNode) {
+          nextRecommendedItem = {
+            nodeId: nextNode.nodeId,
+            topicId: nextNode.topicId?._id || nextNode.topicId || null,
+            title: nextNode.topicName || nextNode.topicId?.title || nextNode.nodeId,
+            category: nextNode.subject || nextNode.topicId?.category || 'dsa',
+            status: nextNode.status,
+            priority: nextNode.priority || 'Medium'
+          };
+        }
+
         todayTasks = roadmapNodes.filter(n => ['in_progress', 'CURRENT'].includes(n.status)).slice(0, 3);
         if (todayTasks.length === 0 && roadmapNodes.length > 0) {
           todayTasks = [roadmapNodes[0]];
@@ -99,6 +143,7 @@ export const getStudentDashboard = async (req, res) => {
     const totalSolvedQuestions = await AttemptTrack.countDocuments({ userId, isCorrect: true }).catch(() => 0);
     const unresolvedMistakesCount = await MistakeJournal.countDocuments({ userId, resolved: false }).catch(() => 0);
     const dueRevisionCardsCount = await RevisionCard.countDocuments({ userId, nextReviewAt: { $lte: new Date() } }).catch(() => 0);
+    const savedConceptsCount = await SavedConcept.countDocuments({ userId }).catch(() => 0);
     const reassessmentAvailable = Boolean(latestAnalysis || (weakAreas && weakAreas.length > 0));
 
     res.json({
@@ -108,6 +153,7 @@ export const getStudentDashboard = async (req, res) => {
         profile,
         roadmapPreview,
         currentRoadmapItem,
+        nextRecommendedItem,
         todayTasks,
         strongAreas,
         weakAreas,
@@ -122,7 +168,9 @@ export const getStudentDashboard = async (req, res) => {
         recentActivity,
         unresolvedMistakesCount,
         dueRevisionCardsCount,
-        reassessmentAvailable
+        savedConceptsCount,
+        reassessmentAvailable,
+        latestAnalysis
       }
     });
   } catch (error) {

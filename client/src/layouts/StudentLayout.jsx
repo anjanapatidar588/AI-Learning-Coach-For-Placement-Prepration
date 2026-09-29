@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard,
@@ -22,18 +22,32 @@ import {
   BookX,
   RotateCcw,
   BarChart3,
-  Compass
+  Compass,
+  Brain
 } from 'lucide-react';
 
 const StudentLayout = () => {
-  const { user, logout } = useAuth();
+  const { user, profile, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // If taking an assessment, provide full-width dedicated workspace without distracting sidebar/headers
+  if (location.pathname.startsWith('/student/assessments/take')) {
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-800">
+        <Outlet />
+      </div>
+    );
+  }
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+
+  const isOnboardingIncomplete = !profile?.onboardingCompleted;
+  const isAssessmentPending = profile?.onboardingCompleted && !profile?.baselineAssessmentCompleted;
 
   const navGroups = [
     {
@@ -120,6 +134,39 @@ const StudentLayout = () => {
               <X className="w-5 h-5" />
             </button>
           </div>
+
+          {/* Onboarding Flow Indicator Banner if incomplete */}
+          {isOnboardingIncomplete && (
+            <div className="mx-3.5 mt-3 p-3 rounded-xl bg-indigo-50 border border-indigo-200 space-y-1">
+              <div className="flex items-center space-x-1.5 text-xs font-bold text-indigo-900">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Step 1: Onboarding</span>
+              </div>
+              <p className="text-[11px] text-indigo-700">Complete your profile to personalize prep.</p>
+              <NavLink
+                to="/student/onboarding"
+                className="inline-block mt-1 text-[11px] font-bold text-indigo-600 hover:underline"
+              >
+                Continue Onboarding →
+              </NavLink>
+            </div>
+          )}
+
+          {isAssessmentPending && (
+            <div className="mx-3.5 mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 space-y-1">
+              <div className="flex items-center space-x-1.5 text-xs font-bold text-amber-900">
+                <Brain className="w-3.5 h-3.5 text-amber-600" />
+                <span>Step 2: Initial Assessment</span>
+              </div>
+              <p className="text-[11px] text-amber-700">Required to unlock personalized dashboard & roadmap.</p>
+              <NavLink
+                to="/student/assessment-ready"
+                className="inline-block mt-1 text-[11px] font-bold text-amber-800 hover:underline"
+              >
+                Start Assessment →
+              </NavLink>
+            </div>
+          )}
 
           {/* Navigation Group Links */}
           <nav className="p-3.5 space-y-4 overflow-y-auto flex-1">

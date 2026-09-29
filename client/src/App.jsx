@@ -14,6 +14,7 @@ import AdminLayout from './layouts/AdminLayout';
 
 // Student Modules (Authentic Backend Data-driven)
 import StudentDashboard from './modules/student/Dashboard';
+import StudentOnboarding from './modules/student/StudentOnboarding';
 import StudentRoadmap from './modules/student/StudentRoadmap';
 import StudentLearningExperience from './modules/student/StudentLearningExperience';
 import DSAModule from './modules/student/DSAModule';
@@ -47,6 +48,14 @@ import ResourceManagement from './modules/admin/ResourceManagement';
 import AIConfiguration from './modules/admin/AIConfiguration';
 import PlatformAnalytics from './modules/admin/PlatformAnalytics';
 
+import { useAuth } from './context/AuthContext';
+import { getStudentInitialRoute } from './utils/studentRouting';
+
+function StudentIndexRedirect() {
+  const { profile } = useAuth();
+  return <Navigate to={getStudentInitialRoute(profile)} replace />;
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -64,7 +73,10 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="/student/dashboard" replace />} />
+        <Route index element={<StudentIndexRedirect />} />
+        <Route path="onboarding" element={<StudentOnboarding />} />
+        <Route path="assessment-ready" element={<AssessmentReady />} />
+        <Route path="assessment-ready/:assessmentId" element={<AssessmentReady />} />
         <Route path="dashboard" element={<StudentDashboard />} />
         <Route path="roadmap" element={<StudentRoadmap />} />
         <Route path="learn/:topicId" element={<StudentLearningExperience />} />
@@ -118,7 +130,7 @@ function AppRoutes() {
       </Route>
 
       {/* 4. Legacy Aliases & Redirects */}
-      <Route path="/dashboard" element={<Navigate to="/student/dashboard" replace />} />
+      <Route path="/dashboard" element={<StudentIndexRedirect />} />
       <Route path="/roadmap" element={<Navigate to="/student/roadmap" replace />} />
       <Route path="/assessment" element={<Navigate to="/student/assessment" replace />} />
       <Route path="/assessments" element={<Navigate to="/student/assessment" replace />} />

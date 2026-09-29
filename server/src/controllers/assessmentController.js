@@ -218,6 +218,14 @@ export const submitBaselineAssessment = async (req, res) => {
     profile.baselineScore = overallAccuracy;
     profile.baselineCompletedAt = new Date();
 
+    if (overallAccuracy >= 75) {
+      profile.currentSkillLevel = 'Advanced';
+    } else if (overallAccuracy >= 45) {
+      profile.currentSkillLevel = 'Intermediate';
+    } else {
+      profile.currentSkillLevel = 'Beginner';
+    }
+
     await profile.save().catch(() => {});
 
     // Recalculate Readiness Score & Adaptive Roadmap

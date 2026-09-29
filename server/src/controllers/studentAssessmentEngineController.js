@@ -183,6 +183,29 @@ export const submitStudentAssessment = async (req, res) => {
         status: 'IN_PROGRESS',
         startedAt: new Date(Date.now() - 5 * 60 * 1000)
       });
+    } else if (attempt.status === 'COMPLETED') {
+      return res.json({
+        success: true,
+        message: 'Assessment already completed',
+        data: {
+          assessmentId: assessment._id.toString(),
+          attemptId: attempt._id.toString(),
+          summary: {
+            totalQuestions: attempt.totalQuestions,
+            attempted: attempt.attemptedQuestions,
+            correct: attempt.correctAnswers,
+            incorrect: attempt.incorrectAnswers,
+            unanswered: attempt.unansweredQuestions,
+            totalMarks: attempt.totalMarks,
+            obtainedMarks: attempt.obtainedMarks,
+            percentage: attempt.percentage
+          },
+          subjectPerformance: attempt.subjectPerformance,
+          topicPerformance: attempt.topicPerformance,
+          difficultyPerformance: attempt.difficultyPerformance,
+          alreadyCompleted: true
+        }
+      });
     }
 
     // Authoritative Server-side Timing Check
@@ -389,6 +412,15 @@ export const submitStudentAssessment = async (req, res) => {
     profile.baselineScore = overallPercentage;
     profile.baselineCompletedAt = now;
     profile.totalProblemsSolved += correctCount;
+
+    // Authoritative skill level determined from assessment score (Beginner, Intermediate, Advanced)
+    if (overallPercentage >= 75) {
+      profile.currentSkillLevel = 'Advanced';
+    } else if (overallPercentage >= 45) {
+      profile.currentSkillLevel = 'Intermediate';
+    } else {
+      profile.currentSkillLevel = 'Beginner';
+    }
 
     if (subjectStats.dsa.total > 0) profile.dsaMastery = subjectStats.dsa.accuracy;
     if (subjectStats.aptitude.total > 0) profile.aptitudeMastery = subjectStats.aptitude.accuracy;

@@ -3,27 +3,29 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import PathPilotLogo from '../../components/common/PathPilotLogo';
 import { ArrowRight, Lock, Mail, Loader2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { getStudentInitialRoute } from '../../utils/studentRouting';
 
 const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, user, loading: authLoading } = useAuth();
+  const { login, user, profile, loading: authLoading } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // If already authenticated, redirect to role-specific dashboard
+  // If already authenticated, redirect to role-specific destination
   useEffect(() => {
     if (user && !authLoading) {
       if (user.role === 'admin') {
         navigate('/admin/dashboard', { replace: true });
       } else {
-        navigate('/student/dashboard', { replace: true });
+        const studentDest = getStudentInitialRoute(profile);
+        navigate(studentDest, { replace: true });
       }
     }
-  }, [user, authLoading, navigate]);
+  }, [user, profile, authLoading, navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -44,7 +46,13 @@ const LoginPage = () => {
         if (res.user.role === 'admin') {
           navigate(from?.startsWith('/admin') ? from : '/admin/dashboard', { replace: true });
         } else {
-          navigate(from?.startsWith('/student') ? from : '/student/dashboard', { replace: true });
+          const studentProfile = res.profile || profile;
+          const studentDest = getStudentInitialRoute(studentProfile);
+          if (studentProfile?.onboardingCompleted && studentProfile?.baselineAssessmentCompleted && from?.startsWith('/student')) {
+            navigate(from, { replace: true });
+          } else {
+            navigate(studentDest, { replace: true });
+          }
         }
       } else {
         setError(res.message || 'Invalid email or password.');
@@ -55,6 +63,7 @@ const LoginPage = () => {
       setSubmitting(false);
     }
   };
+
 
   return (
     <div className="min-h-screen pathpilot-bg text-slate-100 flex flex-col items-center justify-center p-4 relative overflow-hidden">

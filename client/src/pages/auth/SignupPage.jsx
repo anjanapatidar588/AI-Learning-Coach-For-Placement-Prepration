@@ -10,20 +10,25 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { getStudentInitialRoute } from '../../utils/studentRouting';
 
 const SignupPage = () => {
   const navigate = useNavigate();
-  const { register, user, loading: authLoading } = useAuth();
+  const { register, user, profile, loading: authLoading } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // If already authenticated, redirect
+  // If already authenticated, redirect to appropriate destination
   React.useEffect(() => {
     if (user && !authLoading) {
-      if (user.role === 'admin') navigate('/admin/dashboard', { replace: true });
-      else navigate('/student/dashboard', { replace: true });
+      if (user.role === 'admin') {
+        navigate('/admin/dashboard', { replace: true });
+      } else {
+        navigate(getStudentInitialRoute(profile), { replace: true });
+      }
     }
-  }, [user, authLoading, navigate]);
+  }, [user, profile, authLoading, navigate]);
+
 
   // Form State
   const [formData, setFormData] = useState({
@@ -66,7 +71,8 @@ const SignupPage = () => {
         if (formData.role === 'admin') {
           navigate('/admin/dashboard', { replace: true });
         } else {
-          navigate('/student/dashboard', { replace: true });
+          // Redirect newly registered student directly to onboarding
+          navigate('/student/onboarding', { replace: true });
         }
       } else {
         setError(res.message || 'Registration failed. Please check your information.');

@@ -58,8 +58,28 @@ const createMockReqRes = (headers = {}, body = {}, query = {}, params = {}) => {
 
 const runMiddleware = (middleware, req, res) => {
   return new Promise((resolve) => {
-    middleware(req, res, () => resolve(true));
-    setTimeout(() => resolve(false), 10);
+    let done = false;
+    const next = () => {
+      if (!done) {
+        done = true;
+        resolve(true);
+      }
+    };
+    const originalJson = res.json.bind(res);
+    res.json = (data) => {
+      originalJson(data);
+      if (!done) {
+        done = true;
+        resolve(false);
+      }
+      return res;
+    };
+    Promise.resolve(middleware(req, res, next)).catch(() => {
+      if (!done) {
+        done = true;
+        resolve(false);
+      }
+    });
   });
 };
 

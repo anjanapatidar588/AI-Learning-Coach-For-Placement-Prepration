@@ -17,7 +17,8 @@ import {
   ShieldAlert,
   Play,
   Check,
-  SkipForward
+  SkipForward,
+  LayoutDashboard
 } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
@@ -185,9 +186,17 @@ const StudentRoadmap = () => {
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <button
+              onClick={() => navigate('/student/dashboard')}
+              className="btn-secondary text-xs px-4 py-2.5 flex items-center justify-center space-x-1.5 cursor-pointer"
+            >
+              <LayoutDashboard className="w-4 h-4 text-slate-600" />
+              <span>Go to Dashboard</span>
+            </button>
+
+            <button
               onClick={handleRecalculate}
               disabled={recalculating}
-              className="btn-primary text-xs px-4 py-2.5 flex items-center justify-center space-x-2 disabled:opacity-50"
+              className="btn-primary text-xs px-4 py-2.5 flex items-center justify-center space-x-2 disabled:opacity-50 cursor-pointer"
             >
               <RotateCw className={`w-4 h-4 ${recalculating ? 'animate-spin' : ''}`} />
               <span>{recalculating ? 'Recalculating...' : 'Re-sync Roadmap'}</span>
