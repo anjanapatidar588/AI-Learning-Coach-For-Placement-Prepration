@@ -6,8 +6,10 @@ import { authorize } from '../middleware/roleMiddleware.js';
 const router = express.Router();
 
 router.use(protect);
+router.use(authorize('student'));
 
-router.post('/coach/chat', authorize('student'), chatWithCoach);
-router.post('/recommendation-explain', authorize('student'), explainRecommendation);
+router.post('/coach/chat', chatWithCoach);
+router.post('/recommendation-explain', explainRecommendation);
 
 export default router;
+

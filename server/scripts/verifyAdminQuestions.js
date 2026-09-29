@@ -42,11 +42,35 @@ const createMockReqRes = (headers = {}, body = {}, query = {}, params = {}) => {
 };
 
 const runMiddleware = (middleware, req, res) => {
-  return new Promise((resolve) => {
-    middleware(req, res, () => resolve(true));
-    setTimeout(() => resolve(false), 10);
+  return new Promise(async (resolve) => {
+    let resolved = false;
+    const oldStatus = res.status.bind(res);
+    const oldJson = res.json.bind(res);
+    res.status = function (code) {
+      this.statusCode = code;
+      return this;
+    };
+    res.json = function (data) {
+      this.body = data;
+      if (!resolved) {
+        resolved = true;
+        resolve(false);
+      }
+      return this;
+    };
+    try {
+      await middleware(req, res, () => {
+        if (!resolved) {
+          resolved = true;
+          resolve(true);
+        }
+      });
+    } catch (e) {
+      if (!resolved) resolve(false);
+    }
   });
 };
+
 
 const runAdminQuestionsVerification = async () => {
   console.log('[AdminQuestionsTest] Starting Step 46 Dedicated Admin Question Management Verification...');

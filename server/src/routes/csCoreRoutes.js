@@ -11,10 +11,12 @@ import { authorize } from '../middleware/roleMiddleware.js';
 const router = express.Router();
 
 router.use(protect);
+router.use(authorize('student'));
 
-router.get('/subjects', authorize('student'), getCSCoreSubjects);
-router.get('/topics/:subjectId', authorize('student'), getCSCoreTopics);
-router.post('/quiz/submit', authorize('student'), submitCSCoreQuiz);
+router.get('/subjects', getCSCoreSubjects);
+router.get('/topics/:subjectId', getCSCoreTopics);
+router.post('/quiz/submit', submitCSCoreQuiz);
 router.post('/ai-explain', getCSCoreAIConcept);
 
 export default router;
+

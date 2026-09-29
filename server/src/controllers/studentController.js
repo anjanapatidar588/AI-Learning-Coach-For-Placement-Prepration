@@ -2,6 +2,7 @@ import LearnerProfile from '../models/LearnerProfile.js';
 import Roadmap from '../models/Roadmap.js';
 import AttemptTrack from '../models/AttemptTrack.js';
 import WeaknessAnalysis from '../models/WeaknessAnalysis.js';
+import AssessmentAnalysis from '../models/AssessmentAnalysis.js';
 import Achievement from '../models/Achievement.js';
 import Question from '../models/Question.js';
 import User from '../models/User.js';
@@ -10,6 +11,9 @@ import { PERSONA_PROMPTS } from '../services/ai/promptTemplates.js';
 import { generateRecommendations } from '../services/recommendationService.js';
 import { calculateReadinessScore } from '../services/readinessScoreService.js';
 import { adaptStudentRoadmap } from '../services/adaptiveRoadmapService.js';
+
+import MistakeJournal from '../models/MistakeJournal.js';
+import RevisionCard from '../models/RevisionCard.js';
 
 export const getStudentDashboard = async (req, res) => {
   try {
@@ -30,25 +34,58 @@ export const getStudentDashboard = async (req, res) => {
     profile = await LearnerProfile.findOne({ userId }).select('-__v');
 
     let roadmapPreview = null;
+    let currentRoadmapItem = null;
+    let todayTasks = [];
+    let strongAreas = [];
+    let weakAreas = [];
+    let roadmapProgressPercent = 0;
+    let assessmentStatus = {
+      completed: profile.baselineAssessmentCompleted || false,
+      score: profile.baselineScore || 0,
+      completedAt: profile.baselineCompletedAt || null
+    };
+
     const existingRoadmap = await Roadmap.findOne({ userId });
     const hasAttempts = await AttemptTrack.exists({ userId });
+    const latestAnalysis = await AssessmentAnalysis.findOne({ studentId: userId }).sort({ generatedAt: -1 }).lean().catch(() => null);
 
-    if (existingRoadmap || hasAttempts) {
-      const { roadmap: adaptiveRoadmap } = await adaptStudentRoadmap(userId, { forceRecalculate: false });
+    let completedTopicsCount = 0;
+    let totalTopicsCount = 0;
+
+    if (existingRoadmap || hasAttempts || latestAnalysis) {
+      const { roadmap: adaptiveRoadmap, adaptiveSummary } = await adaptStudentRoadmap(userId, { forceRecalculate: false });
       const roadmapNodes = adaptiveRoadmap?.nodes || [];
+
       if (roadmapNodes.length > 0) {
         roadmapPreview = roadmapNodes.slice(0, 5).map(node => ({
           nodeId: node.nodeId,
-          title: node.topicId?.title || node.nodeId,
-          category: node.topicId?.category || 'dsa',
+          title: node.topicName || node.topicId?.title || node.nodeId,
+          category: node.subject || node.topicId?.category || 'dsa',
           status: node.status,
+          priority: node.priority || 'Medium',
           priorityScore: node.priorityScore,
-          estimatedHours: node.estimatedHours,
+          estimatedMinutes: node.estimatedMinutes || 45,
+          estimatedHours: node.estimatedHours || 0.75,
           recommendedActivity: node.recommendedActivity,
           recommendedDifficulty: node.recommendedDifficulty,
-          adaptiveReason: node.adaptiveReason
+          adaptiveReason: node.adaptiveReason || node.reason
         }));
+
+        currentRoadmapItem = adaptiveSummary?.currentLearningItem || roadmapPreview.find(n => ['in_progress', 'CURRENT'].includes(n.status)) || roadmapPreview[0];
+        todayTasks = roadmapNodes.filter(n => ['in_progress', 'CURRENT'].includes(n.status)).slice(0, 3);
+        if (todayTasks.length === 0 && roadmapNodes.length > 0) {
+          todayTasks = [roadmapNodes[0]];
+        }
+
+        completedTopicsCount = roadmapNodes.filter(n => ['completed', 'COMPLETED'].includes(n.status)).length;
+        totalTopicsCount = roadmapNodes.length;
+        roadmapProgressPercent = Math.round((completedTopicsCount / roadmapNodes.length) * 100);
       }
+    }
+
+    if (latestAnalysis) {
+      strongAreas = (latestAnalysis.strongTopics || []).map(s => s.topicName);
+      weakAreas = (latestAnalysis.weakTopics || []).map(w => ({ topicName: w.topicName, priority: w.priority, accuracy: w.accuracy }));
     }
 
     const recentActivity = await AttemptTrack.find({ userId })
@@ -56,7 +93,13 @@ export const getStudentDashboard = async (req, res) => {
       .limit(5)
       .populate('questionId', 'title difficulty category')
       .select('-__v')
-      .catch(() => []); // Fallback if populate fails
+      .catch(() => []);
+
+    // Step 6 lightweight dashboard counts
+    const totalSolvedQuestions = await AttemptTrack.countDocuments({ userId, isCorrect: true }).catch(() => 0);
+    const unresolvedMistakesCount = await MistakeJournal.countDocuments({ userId, resolved: false }).catch(() => 0);
+    const dueRevisionCardsCount = await RevisionCard.countDocuments({ userId, nextReviewAt: { $lte: new Date() } }).catch(() => 0);
+    const reassessmentAvailable = Boolean(latestAnalysis || (weakAreas && weakAreas.length > 0));
 
     res.json({
       success: true,
@@ -64,10 +107,22 @@ export const getStudentDashboard = async (req, res) => {
         user,
         profile,
         roadmapPreview,
+        currentRoadmapItem,
+        todayTasks,
+        strongAreas,
+        weakAreas,
+        roadmapProgressPercent,
+        completedTopicsCount,
+        totalTopicsCount,
+        totalSolvedQuestions,
+        assessmentStatus,
         readinessScore: readinessDetails.score,
         readinessDetails,
         dailyGoal: null,
-        recentActivity
+        recentActivity,
+        unresolvedMistakesCount,
+        dueRevisionCardsCount,
+        reassessmentAvailable
       }
     });
   } catch (error) {
@@ -79,10 +134,12 @@ export const getRoadmap = async (req, res) => {
   try {
     const userId = req.user.userId || req.user._id;
 
+    const profile = await LearnerProfile.findOne({ userId }).lean().catch(() => null);
     const existing = await Roadmap.findOne({ userId });
     const hasAttempts = await AttemptTrack.exists({ userId });
+    const latestAnalysis = await AssessmentAnalysis.findOne({ studentId: userId }).sort({ generatedAt: -1 }).lean().catch(() => null);
 
-    if (!existing && !hasAttempts) {
+    if (!existing && !hasAttempts && !latestAnalysis) {
       return res.json({ success: true, data: null, message: 'No roadmap found' });
     }
 
@@ -94,29 +151,151 @@ export const getRoadmap = async (req, res) => {
 
     res.json({
       success: true,
-      data: {
-        ...roadmap,
-        adaptiveSummary
-      }
+      data: formatRoadmapResponse(roadmap, adaptiveSummary, latestAnalysis, profile)
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
+const formatRoadmapResponse = (roadmap, adaptiveSummary, latestAnalysis, profile) => {
+  const nodes = (roadmap?.nodes || []).map(node => ({
+    nodeId: node.nodeId,
+    topicId: node.topicId?._id || node.topicId,
+    topicName: node.topicName || node.topicId?.title || node.nodeId,
+    subject: node.subject || node.topicId?.category || 'dsa',
+    status: node.status,
+    priority: node.priority || 'Medium',
+    priorityScore: node.priorityScore || 50,
+    estimatedMinutes: node.estimatedMinutes || 45,
+    estimatedHours: node.estimatedHours || 0.75,
+    recommendedActivity: node.recommendedActivity,
+    recommendedDifficulty: node.recommendedDifficulty,
+    adaptiveReason: node.adaptiveReason || node.reason,
+    reason: node.adaptiveReason || node.reason,
+    sequence: node.sequence,
+    source: node.source
+  }));
+
+  // Subject-wise Learning Map Grouping
+  const learningMapBySubject = {};
+  nodes.forEach(node => {
+    const subjKey = (node.subject || 'dsa').toLowerCase();
+    if (!learningMapBySubject[subjKey]) {
+      learningMapBySubject[subjKey] = {
+        subjectName: subjKey.toUpperCase(),
+        completed: [],
+        current: [],
+        upcoming: []
+      };
+    }
+    const cat = learningMapBySubject[subjKey];
+    if (['completed', 'COMPLETED'].includes(node.status)) {
+      cat.completed.push(node);
+    } else if (['in_progress', 'CURRENT', 'IN_PROGRESS'].includes(node.status)) {
+      cat.current.push(node);
+    } else {
+      cat.upcoming.push(node);
+    }
+  });
+
+  const completedCount = nodes.filter(n => ['completed', 'COMPLETED'].includes(n.status)).length;
+  const overallProgressPercent = nodes.length > 0 ? Math.round((completedCount / nodes.length) * 100) : 0;
+
+  return {
+    ...roadmap,
+    nodes,
+    learningMapBySubject,
+    overallProgressPercent,
+    currentLearningItem: adaptiveSummary?.currentLearningItem || nodes.find(n => ['in_progress', 'CURRENT'].includes(n.status)) || nodes[0] || null,
+    todayRecommendedTasks: nodes.filter(n => ['in_progress', 'CURRENT'].includes(n.status)).slice(0, 3),
+    strongAreas: latestAnalysis ? (latestAnalysis.strongTopics || []) : [],
+    weakAreas: latestAnalysis ? (latestAnalysis.weakTopics || []) : [],
+    priorityTopics: latestAnalysis ? (latestAnalysis.priorityTopics || []) : [],
+    knowledgeGaps: latestAnalysis ? (latestAnalysis.knowledgeGaps || []) : [],
+    aiInsights: latestAnalysis ? latestAnalysis.aiAnalysis : null,
+    studentContext: {
+      targetRole: profile?.targetRoles && profile.targetRoles.length > 0 ? profile.targetRoles[0] : 'Software Developer',
+      graduationYear: profile?.graduationYear || null,
+      targetDate: profile?.targetDate || null,
+      dailyPreparationTime: profile?.dailyPreparationTime || '1-2 hours'
+    },
+    adaptiveSummary
+  };
+};
+
 export const recalculateRoadmap = async (req, res) => {
   try {
     const userId = req.user.userId || req.user._id;
+    const profile = await LearnerProfile.findOne({ userId }).lean().catch(() => null);
+    const latestAnalysis = await AssessmentAnalysis.findOne({ studentId: userId }).sort({ generatedAt: -1 }).lean().catch(() => null);
 
     const { roadmap, adaptiveSummary } = await adaptStudentRoadmap(userId, { forceRecalculate: true });
 
     res.json({
       success: true,
       message: 'Roadmap recalculated successfully',
-      data: {
-        ...roadmap,
-        adaptiveSummary
+      data: formatRoadmapResponse(roadmap, adaptiveSummary, latestAnalysis, profile)
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * PATCH /api/v1/student/roadmap/nodes/:nodeId/status
+ * Allows student to update node status ('in_progress' | 'completed' | 'SKIPPED' | 'locked').
+ * Strictly ignores any parameters attempting to tamper with assessment scores/accuracy.
+ */
+export const updateRoadmapNodeStatus = async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user._id;
+    const { nodeId } = req.params;
+    const { status } = req.body;
+
+    const allowedStatuses = ['locked', 'in_progress', 'completed', 'NOT_STARTED', 'CURRENT', 'IN_PROGRESS', 'COMPLETED', 'SKIPPED'];
+    if (!status || !allowedStatuses.includes(status)) {
+      return res.status(400).json({ success: false, message: `Invalid status. Allowed values: ${allowedStatuses.join(', ')}` });
+    }
+
+    const roadmap = await Roadmap.findOne({ userId });
+    if (!roadmap) {
+      return res.status(404).json({ success: false, message: 'Roadmap not found for student' });
+    }
+
+    const targetNode = roadmap.nodes.find(n => n.nodeId === nodeId || (n.topicId && n.topicId.toString() === nodeId));
+    if (!targetNode) {
+      return res.status(404).json({ success: false, message: 'Roadmap node not found' });
+    }
+
+    // Update node status
+    let normalizedStatus = status;
+    if (status === 'CURRENT' || status === 'IN_PROGRESS') normalizedStatus = 'in_progress';
+    if (status === 'COMPLETED') normalizedStatus = 'completed';
+    if (status === 'NOT_STARTED') normalizedStatus = 'locked';
+
+    targetNode.status = normalizedStatus;
+    targetNode.updatedAt = new Date();
+
+    // If marked completed, unlock the next locked node in sequence
+    if (normalizedStatus === 'completed') {
+      const nextLocked = roadmap.nodes.find(n => n.status === 'locked' && n.nodeId !== targetNode.nodeId);
+      if (nextLocked) {
+        nextLocked.status = 'in_progress';
       }
+    }
+
+    await roadmap.save();
+
+    const profile = await LearnerProfile.findOne({ userId }).lean().catch(() => null);
+    const latestAnalysis = await AssessmentAnalysis.findOne({ studentId: userId }).sort({ generatedAt: -1 }).lean().catch(() => null);
+
+    const { roadmap: populated, adaptiveSummary } = await adaptStudentRoadmap(userId, { forceRecalculate: false });
+
+    res.json({
+      success: true,
+      message: `Roadmap node updated to ${status}`,
+      data: formatRoadmapResponse(populated, adaptiveSummary, latestAnalysis, profile)
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -127,7 +306,6 @@ export const getProgressMetrics = async (req, res) => {
   try {
     const userId = req.user.userId || req.user._id;
 
-    // Fetch all attempts for the authenticated student
     const attempts = await AttemptTrack.find({ userId }).sort({ createdAt: -1 });
 
     const createCategoryMetrics = () => ({
@@ -149,14 +327,12 @@ export const getProgressMetrics = async (req, res) => {
     attempts.forEach(attempt => {
       const isPassed = attempt.status === 'Accepted';
       
-      // Update overall
       progress.overall.totalAttempts++;
       if (isPassed) progress.overall.passedAttempts++;
       else progress.overall.failedAttempts++;
       progress.overall.totalTimeSpentSeconds += (attempt.timeSpentSeconds || 0);
       progress.overall.hintsUsed += (attempt.hintsUsedCount || 0);
 
-      // Update category-specific
       let catKey = null;
       if (attempt.category === 'dsa') catKey = 'dsa';
       else if (attempt.category === 'aptitude') catKey = 'aptitude';
@@ -171,7 +347,6 @@ export const getProgressMetrics = async (req, res) => {
       }
     });
 
-    // Calculate accuracy
     const calculateAccuracy = (metrics) => {
       if (metrics.totalAttempts === 0) return 0;
       return Math.round((metrics.passedAttempts / metrics.totalAttempts) * 100);
@@ -182,7 +357,6 @@ export const getProgressMetrics = async (req, res) => {
     progress.aptitude.accuracy = calculateAccuracy(progress.aptitude);
     progress.csCore.accuracy = calculateAccuracy(progress.csCore);
 
-    // Recent performance (last 5 attempts)
     const recentActivity = attempts.slice(0, 5).map(a => ({
       questionId: a.questionId,
       category: a.category,
@@ -207,7 +381,6 @@ export const getWeakAreas = async (req, res) => {
   try {
     const userId = req.user.userId || req.user._id;
     
-    // Fetch all attempts for the authenticated user and populate question/topic
     const attempts = await AttemptTrack.find({ userId }).populate({
       path: 'questionId',
       populate: { path: 'topicId' }
@@ -254,9 +427,9 @@ export const getWeakAreas = async (req, res) => {
       .filter(stat => stat.accuracy < 60)
       .sort((a, b) => {
         if (a.accuracy !== b.accuracy) {
-          return a.accuracy - b.accuracy; // lower accuracy first
+          return a.accuracy - b.accuracy;
         }
-        return b.totalAttempts - a.totalAttempts; // higher attempts first
+        return b.totalAttempts - a.totalAttempts;
       });
 
     res.json({ success: true, data: { weakAreas } });
@@ -269,7 +442,6 @@ export const getAchievements = async (req, res) => {
   try {
     const userId = req.user.userId || req.user._id;
 
-    // Fetch all attempts for chronological processing
     const attempts = await AttemptTrack.find({ userId }).sort({ createdAt: 1 });
 
     const definitions = [
@@ -311,7 +483,6 @@ export const getAchievements = async (req, res) => {
       };
     });
 
-    // Calculate Streak
     const uniqueDates = [...new Set(attempts.map(a => a.createdAt.toISOString().split('T')[0]))].sort();
     
     let currentStreak = 0;
@@ -371,7 +542,13 @@ export const getStudentProfile = async (req, res) => {
       profile = await LearnerProfile.create({ userId });
     }
 
-    res.json({ success: true, data: profile });
+    const user = await User.findById(userId).select('-passwordHash -__v');
+    const profileData = profile.toObject();
+    if (user) {
+      profileData.user = user;
+    }
+
+    res.json({ success: true, data: profileData });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -380,14 +557,25 @@ export const getStudentProfile = async (req, res) => {
 export const updateStudentProfile = async (req, res) => {
   try {
     const userId = req.user.userId || req.user._id;
-    const { currentSkillLevel, targetRoles, targetDate } = req.body;
+    const {
+      name,
+      college,
+      graduationYear,
+      dailyPreparationTime,
+      currentSkillLevel,
+      targetRoles,
+      targetCompanies,
+      preferredStudyTime,
+      preparationDetails,
+      targetDate,
+      onboardingCompleted
+    } = req.body;
 
     let profile = await LearnerProfile.findOne({ userId });
     if (!profile) {
       profile = await LearnerProfile.create({ userId });
     }
 
-    // Only update allowed fields
     if (currentSkillLevel !== undefined) {
       if (['Beginner', 'Intermediate', 'Advanced'].includes(currentSkillLevel)) {
         profile.currentSkillLevel = currentSkillLevel;
@@ -406,16 +594,68 @@ export const updateStudentProfile = async (req, res) => {
 
     if (targetDate !== undefined) {
       const parsedDate = new Date(targetDate);
-      if (!isNaN(parsedDate)) {
+      if (!isNaN(parsedDate.getTime())) {
         profile.targetDate = parsedDate;
       } else {
         return res.status(400).json({ success: false, message: 'Invalid targetDate' });
       }
     }
 
+    if (college !== undefined) {
+      profile.college = String(college).trim();
+    }
+
+    if (graduationYear !== undefined) {
+      const year = Number(graduationYear);
+      if (!isNaN(year)) {
+        profile.graduationYear = year;
+      }
+    }
+
+    if (dailyPreparationTime !== undefined) {
+      profile.dailyPreparationTime = String(dailyPreparationTime).trim();
+    }
+
+    if (preferredStudyTime !== undefined) {
+      profile.preferredStudyTime = String(preferredStudyTime).trim();
+    }
+
+    if (preparationDetails !== undefined) {
+      profile.preparationDetails = String(preparationDetails).trim();
+    }
+
+    if (targetCompanies !== undefined) {
+      if (Array.isArray(targetCompanies)) {
+        profile.targetCompanies = targetCompanies;
+      } else if (typeof targetCompanies === 'string') {
+        profile.targetCompanies = targetCompanies.split(',').map(c => c.trim()).filter(Boolean);
+      }
+    }
+
+    if (onboardingCompleted !== undefined) {
+      profile.onboardingCompleted = Boolean(onboardingCompleted);
+    }
+
     await profile.save();
 
-    res.json({ success: true, data: profile });
+    if (name || targetCompanies) {
+      const userUpdates = {};
+      if (name) userUpdates.name = String(name).trim();
+      if (targetCompanies && Array.isArray(profile.targetCompanies)) {
+        userUpdates.targetCompanies = profile.targetCompanies;
+      }
+      if (Object.keys(userUpdates).length > 0) {
+        await User.findByIdAndUpdate(userId, userUpdates);
+      }
+    }
+
+    const user = await User.findById(userId).select('-passwordHash -__v');
+    const profileData = profile.toObject();
+    if (user) {
+      profileData.user = user;
+    }
+
+    res.json({ success: true, data: profileData });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

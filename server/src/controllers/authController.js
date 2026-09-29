@@ -17,7 +17,7 @@ const isValidEmail = (email) => {
  */
 export const signupUser = async (req, res) => {
   try {
-    const { name, email, password, targetCompanies, targetRole } = req.body;
+    const { name, email, password, targetCompanies, targetRole, role } = req.body;
 
     // 1. Input Validation
     if (!name || typeof name !== 'string' || !name.trim()) {
@@ -41,33 +41,49 @@ export const signupUser = async (req, res) => {
       return res.status(400).json({ success: false, message: 'User with this email already exists' });
     }
 
-    // 4. Password Hashing via existing utility
+    // 4. Role Normalization & Validation (Only student and admin are permitted)
+    const normalizedRole = role ? String(role).trim().toLowerCase() : 'student';
+    if (!['student', 'admin'].includes(normalizedRole)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid role. Allowed roles are student and admin.'
+      });
+    }
+    const assignedRole = normalizedRole;
+
+    // 5. Password Hashing via existing utility
     const passwordHash = await hashPassword(password);
 
-    // 5. User Creation (Role Security: Forced to 'student', ignoring any client role injection)
+    // 6. User Creation
     const user = await User.create({
       name: name.trim(),
       email: normalizedEmail,
       passwordHash,
-      role: 'student',
+      role: assignedRole,
       targetCompanies: Array.isArray(targetCompanies) ? targetCompanies : ['Google', 'Amazon', 'TCS'],
-      targetRole: targetRole || 'Software Development Engineer (SDE-1)',
+      targetRole: targetRole || (assignedRole === 'admin' ? 'System Administrator' : 'Software Development Engineer (SDE-1)'),
     });
 
-    // 6. Associated LearnerProfile & Initial Roadmap Creation
-    await LearnerProfile.create({ userId: user._id }).catch(() => {});
-    await Roadmap.create({
-      userId: user._id,
-      nodes: [
-        { nodeId: 'node-1', title: 'Arrays & Two Pointers', category: 'dsa', status: 'in_progress', priorityScore: 10, estimatedHours: 4, description: 'Master array traversals, sliding window, and two pointer techniques.' },
-        { nodeId: 'node-2', title: 'Quantitative Aptitude (Percentages & Profit/Loss)', category: 'aptitude', status: 'in_progress', priorityScore: 9, estimatedHours: 3, description: 'Core numerical techniques for online screening tests.' },
-        { nodeId: 'node-3', title: 'DBMS Fundamentals & SQL', category: 'cs_core', status: 'locked', priorityScore: 8, estimatedHours: 5, description: 'Relational algebra, SQL queries, B-Trees, and Normalization.' }
-      ]
-    }).catch(() => {});
+    // 7. Initialize learner assets for students only
+    if (assignedRole === 'student') {
+      await LearnerProfile.create({ userId: user._id }).catch(() => {});
+      await Roadmap.create({
+        userId: user._id,
+        nodes: [
+          { nodeId: 'node-1', title: 'Arrays & Two Pointers', category: 'dsa', status: 'in_progress', priorityScore: 10, estimatedHours: 4, description: 'Master array traversals, sliding window, and two pointer techniques.' },
+          { nodeId: 'node-2', title: 'Quantitative Aptitude (Percentages & Profit/Loss)', category: 'aptitude', status: 'in_progress', priorityScore: 9, estimatedHours: 3, description: 'Core numerical techniques for online screening tests.' },
+          { nodeId: 'node-3', title: 'DBMS Fundamentals & SQL', category: 'cs_core', status: 'locked', priorityScore: 8, estimatedHours: 5, description: 'Relational algebra, SQL queries, B-Trees, and Normalization.' }
+        ]
+      }).catch(() => {});
+    }
 
-    // 7. Safe Response (Never exposing password or passwordHash)
+    // 7. Generate JWT token for immediate authenticated session
+    const token = generateToken({ id: user._id, role: user.role });
+
+    // 8. Safe Response (Never exposing password or passwordHash)
     return res.status(201).json({
       success: true,
+      token,
       user: {
         id: user._id,
         name: user.name,

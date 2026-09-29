@@ -38,7 +38,10 @@ const scripts = [
   'verifyAdminQuestions.js',
   'verifyAdminStudents.js',
   'verifyAdminTopics.js',
-  'verifyGeminiApi.js'
+  'verifyAssessmentAnalysisRoadmap.js',
+  'verifyGeminiApi.js',
+  'verifyRevisionMistakeReassessment.js',
+  'verifyFinalIntegration.js'
 ];
 
 let failed = false;

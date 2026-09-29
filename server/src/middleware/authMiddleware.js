@@ -1,9 +1,10 @@
 import { verifyToken } from '../utils/jwtUtil.js';
+import User from '../models/User.js';
 
 /**
- * Authentication middleware that verifies JWT Bearer token and attaches user context to req.user
+ * Authentication middleware that verifies JWT Bearer token and attaches authoritative user context from DB
  */
-export const protect = (req, res, next) => {
+export const protect = async (req, res, next) => {
   let token;
 
   const authHeader = req.headers.authorization;
@@ -13,16 +14,6 @@ export const protect = (req, res, next) => {
   }
 
   if (!token) {
-    // Development fallback if x-mock-role header is explicitly passed in dev mode
-    if (process.env.NODE_ENV === 'development' && req.headers['x-mock-role']) {
-      const mockRole = req.headers['x-mock-role'];
-      req.user = {
-        userId: mockRole === 'admin' ? '650000000000000000000001' : '650000000000000000000002',
-        role: mockRole
-      };
-      return next();
-    }
-
     return res.status(401).json({
       success: false,
       message: 'Authentication failed. Missing or invalid Authorization header.'
@@ -31,11 +22,30 @@ export const protect = (req, res, next) => {
 
   try {
     const decoded = verifyToken(token);
+    const userId = decoded.id || decoded.userId;
 
-    // Attach clean request context
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication failed. Token missing user identity.'
+      });
+    }
+
+    const user = await User.findById(userId).select('-passwordHash');
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication failed. User no longer exists.'
+      });
+    }
+
+    // Attach authoritative database-derived user context
     req.user = {
-      userId: decoded.id || decoded.userId,
-      role: decoded.role || 'student'
+      userId: user._id.toString(),
+      id: user._id.toString(),
+      role: user.role,
+      name: user.name,
+      email: user.email
     };
 
     return next();
@@ -46,3 +56,4 @@ export const protect = (req, res, next) => {
     });
   }
 };
+

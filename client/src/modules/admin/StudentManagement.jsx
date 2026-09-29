@@ -116,37 +116,37 @@ const StudentManagement = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="glass-panel p-6 rounded-2xl border border-purple-500/30 bg-gradient-to-r from-slate-900 via-purple-950/20 to-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="glass-panel p-6 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/80 via-purple-50/40 to-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400 flex items-center justify-center">
-            <Users className="w-6 h-6" />
+          <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+            <Users className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white tracking-tight">Student Directory & Monitoring</h1>
-            <p className="text-xs text-slate-400 mt-0.5">Monitor registered student performance, readiness indices, and learning milestones.</p>
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">Student Directory & Monitoring</h1>
+            <p className="text-xs text-slate-500 mt-0.5">Monitor registered student performance, readiness indices, and learning milestones.</p>
           </div>
         </div>
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center space-x-2">
-          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center space-x-2">
+          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {/* Filter Bar */}
-      <div className="glass-panel p-4 rounded-2xl border border-slate-800">
+      <div className="glass-panel p-4 rounded-2xl border border-slate-200/80 bg-white">
         <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           {/* Search Input */}
           <div className="relative lg:col-span-2">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by student name or email..."
-              className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-purple-500/50"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
             />
           </div>
 
@@ -155,7 +155,7 @@ const StudentManagement = () => {
             <select
               value={baselineFilter}
               onChange={(e) => { setBaselineFilter(e.target.value); setPage(1); }}
-              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-purple-500/50"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-indigo-500"
             >
               <option value="all">All Baseline Statuses</option>
               <option value="completed">Completed</option>
@@ -168,7 +168,7 @@ const StudentManagement = () => {
             <select
               value={skillFilter}
               onChange={(e) => { setSkillFilter(e.target.value); setPage(1); }}
-              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-purple-500/50"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-indigo-500"
             >
               <option value="all">All Skill Levels</option>
               <option value="Beginner">Beginner</option>
@@ -181,15 +181,15 @@ const StudentManagement = () => {
           <div className="flex items-center space-x-2">
             <button
               type="submit"
-              className="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
+              className="flex-1 py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
             >
-              <Filter className="w-3.5 h-3.5 text-purple-400" />
+              <Filter className="w-3.5 h-3.5 text-indigo-300" />
               <span>Filter</span>
             </button>
             <button
               type="button"
               onClick={handleClearFilters}
-              className="py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 text-xs font-medium transition-colors cursor-pointer"
+              className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-medium transition-colors cursor-pointer"
             >
               Reset
             </button>
@@ -198,16 +198,16 @@ const StudentManagement = () => {
       </div>
 
       {/* Student Table */}
-      <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden">
+      <div className="glass-panel rounded-2xl border border-slate-200/80 bg-white overflow-hidden">
         {loading ? (
           <div className="py-16 flex flex-col items-center justify-center space-y-3">
-            <Loader2 className="w-7 h-7 text-purple-400 animate-spin" />
-            <p className="text-xs text-slate-400 font-mono">Loading registered students...</p>
+            <Loader2 className="w-7 h-7 text-indigo-600 animate-spin" />
+            <p className="text-xs text-slate-500 font-medium">Loading registered students...</p>
           </div>
         ) : students.length === 0 ? (
           <div className="py-16 text-center space-y-3">
-            <Users className="w-10 h-10 text-slate-600 mx-auto" />
-            <h3 className="text-sm font-semibold text-slate-300">No students found</h3>
+            <Users className="w-10 h-10 text-slate-300 mx-auto" />
+            <h3 className="text-sm font-semibold text-slate-800">No students found</h3>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
               No registered students matched your query filters or the system database has no active student records.
             </p>
@@ -216,7 +216,7 @@ const StudentManagement = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-slate-800 bg-slate-900/60 text-slate-400 uppercase font-mono text-[10px]">
+                <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-500 uppercase font-semibold text-[10px]">
                   <th className="py-3 px-4">Student</th>
                   <th className="py-3 px-4">Email</th>
                   <th className="py-3 px-4">Skill Level</th>
@@ -226,55 +226,55 @@ const StudentManagement = () => {
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 text-slate-300">
+              <tbody className="divide-y divide-slate-100 text-slate-700">
                 {students.map((s) => {
                   const readiness = typeof s.readinessScore === 'number' ? s.readinessScore : 0;
                   return (
-                    <tr key={s._id || s.id} className="hover:bg-slate-900/40 transition-colors">
-                      <td className="py-3.5 px-4 font-semibold text-slate-100 flex items-center space-x-3">
-                        <div className="w-7 h-7 rounded-full bg-purple-950 border border-purple-500/30 flex items-center justify-center text-purple-300 font-bold text-xs shrink-0">
+                    <tr key={s._id || s.id} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="py-3.5 px-4 font-semibold text-slate-900 flex items-center space-x-3">
+                        <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0">
                           {s.name ? s.name.charAt(0).toUpperCase() : 'S'}
                         </div>
                         <span className="truncate">{s.name}</span>
                       </td>
-                      <td className="py-3.5 px-4 text-slate-400 font-mono">
+                      <td className="py-3.5 px-4 text-slate-500 font-mono">
                         {s.email}
                       </td>
                       <td className="py-3.5 px-4">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
                           {s.currentSkillLevel || 'Intermediate'}
                         </span>
                       </td>
                       <td className="py-3.5 px-4">
                         {s.baselineAssessmentCompleted ? (
-                          <span className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          <span className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                             <CheckCircle2 className="w-3 h-3" />
                             <span>Done ({s.baselineScore || 0}%)</span>
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-50 text-amber-700 border border-amber-200">
                             Pending
                           </span>
                         )}
                       </td>
                       <td className="py-3.5 px-4">
                         <div className="flex items-center space-x-2">
-                          <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                          <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                             <div
-                              className="h-full bg-purple-500 rounded-full transition-all"
+                              className="h-full bg-indigo-600 rounded-full transition-all"
                               style={{ width: `${Math.min(100, Math.max(0, readiness))}%` }}
                             ></div>
                           </div>
-                          <span className="font-mono font-bold text-purple-300">{readiness}%</span>
+                          <span className="font-bold text-indigo-600">{readiness}%</span>
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 text-slate-400 max-w-xs truncate">
+                      <td className="py-3.5 px-4 text-slate-600 max-w-xs truncate">
                         {s.targetRole || 'SDE-1'}
                       </td>
                       <td className="py-3.5 px-4 text-right">
                         <button
                           onClick={() => handleViewStudentDetail(s._id || s.id)}
-                          className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors cursor-pointer"
+                          className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold transition-colors cursor-pointer"
                         >
                           View Profile
                         </button>
@@ -289,24 +289,24 @@ const StudentManagement = () => {
 
         {/* Pagination Footer */}
         {!loading && students.length > 0 && (
-          <div className="px-4 py-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+          <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
             <div>
-              Showing Page <span className="font-bold text-white">{pagination.page}</span> of{' '}
-              <span className="font-bold text-white">{pagination.pages}</span> ({pagination.total} total students)
+              Showing Page <span className="font-bold text-slate-800">{pagination.page}</span> of{' '}
+              <span className="font-bold text-slate-800">{pagination.pages}</span> ({pagination.total} total students)
             </div>
 
             <div className="flex items-center space-x-2">
               <button
                 disabled={pagination.page <= 1}
                 onClick={() => setPage(prev => Math.max(1, prev - 1))}
-                className="p-1.5 rounded-lg bg-slate-800 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-200 transition-colors cursor-pointer"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button
                 disabled={pagination.page >= pagination.pages}
                 onClick={() => setPage(prev => Math.min(pagination.pages, prev + 1))}
-                className="p-1.5 rounded-lg bg-slate-800 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-200 transition-colors cursor-pointer"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>

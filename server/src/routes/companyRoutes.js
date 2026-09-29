@@ -6,8 +6,10 @@ import { authorize } from '../middleware/roleMiddleware.js';
 const router = express.Router();
 
 router.use(protect);
+router.use(authorize('student'));
 
-router.get('/', authorize('student'), getCompanies);
-router.get('/:companyId', authorize('student'), getCompanyDetail);
+router.get('/', getCompanies);
+router.get('/:companyId', getCompanyDetail);
 
 export default router;
+

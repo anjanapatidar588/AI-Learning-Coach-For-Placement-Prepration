@@ -5,13 +5,16 @@ import {
   finishInterview
 } from '../controllers/interviewController.js';
 import { protect } from '../middleware/authMiddleware.js';
+import { authorize } from '../middleware/roleMiddleware.js';
 
 const router = express.Router();
 
 router.use(protect);
+router.use(authorize('student'));
 
 router.post('/start', startInterview);
 router.post('/turn', submitInterviewTurn);
 router.post('/finish', finishInterview);
 
 export default router;
+

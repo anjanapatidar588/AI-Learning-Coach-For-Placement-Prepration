@@ -1,23 +1,30 @@
 import Roadmap from '../models/Roadmap.js';
 import AttemptTrack from '../models/AttemptTrack.js';
 import WeaknessAnalysis from '../models/WeaknessAnalysis.js';
+import AssessmentAnalysis from '../models/AssessmentAnalysis.js';
 import LearnerProfile from '../models/LearnerProfile.js';
 import Topic from '../models/Topic.js';
 
 /**
- * Deterministically adapts a student's learning roadmap based strictly on
- * measured performance (AttemptTrack, WeaknessAnalysis, LearnerProfile, Topic).
+ * Deterministically adapts and personalizes a student's learning roadmap based on:
+ * - Assessment performance
+ * - Strong & Weak topics
+ * - Knowledge gaps
+ * - Target placement date
+ * - Daily preparation time
+ * - Historical attempts & profile state
  *
  * @param {string|mongoose.Types.ObjectId} userId
  * @param {object} [options={}]
  * @param {boolean} [options.forceRecalculate=false]
+ * @param {string} [options.assessmentAttemptId]
  * @returns {Promise<{ roadmap: object, adaptiveSummary: object }>}
  */
 export const adaptStudentRoadmap = async (userId, options = {}) => {
   const forceRecalculate = !!options.forceRecalculate;
 
-  // 1. Fetch student performance data & existing roadmap
-  const [existingRoadmap, attempts, weaknesses, profile, topics] = await Promise.all([
+  // 1. Fetch all student performance data, latest assessment analysis, profile, and topics
+  const [existingRoadmap, attempts, weaknesses, analyses, profile, topics] = await Promise.all([
     Roadmap.findOne({ userId }),
     AttemptTrack.find({ userId }).populate({
       path: 'questionId',
@@ -25,359 +32,357 @@ export const adaptStudentRoadmap = async (userId, options = {}) => {
       populate: { path: 'topicId', select: 'title category' }
     }).lean().catch(() => []),
     WeaknessAnalysis.find({ userId }).populate('topicId', 'title category').lean().catch(() => []),
+    AssessmentAnalysis.find({ studentId: userId }).sort({ generatedAt: -1 }).limit(3).lean().catch(() => []),
     LearnerProfile.findOne({ userId }).lean().catch(() => null),
     Topic.find().sort({ order: 1, createdAt: 1 }).lean().catch(() => [])
   ]);
 
-  const hasPerformanceData = attempts.length > 0 || weaknesses.length > 0;
+  const hasPerformanceData = attempts.length > 0 || weaknesses.length > 0 || analyses.length > 0;
+  const latestAnalysis = analyses[0] || null;
 
-  // 2. Handle cases where student has NO performance data & NO existing roadmap
-  if (!existingRoadmap && !hasPerformanceData) {
-    let initialNodes = [];
-    if (Array.isArray(topics) && topics.length > 0) {
-      initialNodes = topics.slice(0, 5).map((t, idx) => ({
-        nodeId: `node-${t._id}`,
-        topicId: t._id,
-        status: idx === 0 ? 'in_progress' : 'locked',
-        priorityScore: 50,
-        estimatedHours: 3,
-        recommendedActivity: 'TARGETED_PRACTICE',
-        recommendedDifficulty: t.difficulty || 'Medium',
-        adaptiveReason: idx === 0 ? 'Starter topic on your learning path.' : 'Upcoming topic on your learning path.'
-      }));
+  // Calculate Target Date impact & available preparation window
+  let daysRemaining = null;
+  if (profile && profile.targetDate) {
+    const targetMs = new Date(profile.targetDate).getTime();
+    const nowMs = Date.now();
+    if (!isNaN(targetMs) && targetMs > nowMs) {
+      daysRemaining = Math.max(1, Math.round((targetMs - nowMs) / (1000 * 60 * 60 * 24)));
     }
-
-    const newRoadmap = new Roadmap({
-      userId,
-      nodes: initialNodes,
-      lastGeneratedAt: new Date(),
-      version: 1
-    });
-
-    await newRoadmap.save().catch(() => {});
-
-    // Populate topic details for clean return
-    const populated = await Roadmap.findById(newRoadmap._id)
-      .populate('nodes.topicId', 'title category difficulty subject')
-      .lean();
-
-    return {
-      roadmap: populated,
-      adaptiveSummary: {
-        updated: false,
-        reason: 'Initial starter roadmap created. Practice problems to unlock performance-based adaptive recommendations.',
-        nextAction: populated.nodes && populated.nodes.length > 0 ? {
-          category: populated.nodes[0].topicId?.category || 'dsa',
-          topicName: populated.nodes[0].topicId?.title || 'Arrays',
-          activityType: 'TARGETED_PRACTICE',
-          difficulty: 'Medium',
-          priority: 'Medium',
-          reason: 'Starter topic on your learning path.'
-        } : null
-      }
-    };
   }
 
-  // 3. If no existing roadmap but performance data exists, construct initial roadmap from topics
-  let roadmapDoc = existingRoadmap;
-  if (!roadmapDoc) {
-    let initialNodes = [];
-    if (Array.isArray(topics) && topics.length > 0) {
-      initialNodes = topics.slice(0, 6).map((t, idx) => ({
-        nodeId: `node-${t._id}`,
-        topicId: t._id,
-        status: idx === 0 ? 'in_progress' : 'locked',
-        priorityScore: 50,
-        estimatedHours: 3,
-        recommendedActivity: 'TARGETED_PRACTICE',
-        recommendedDifficulty: t.difficulty || 'Medium',
-        adaptiveReason: 'Sequential roadmap node.'
-      }));
-    }
-    roadmapDoc = new Roadmap({
-      userId,
-      nodes: initialNodes,
-      lastGeneratedAt: new Date(),
-      version: 1
-    });
+  // Calculate Daily Study Capacity (Minutes per node) based on profile.dailyPreparationTime
+  const prepTimeStr = (profile?.dailyPreparationTime || '').toLowerCase();
+  let defaultEstimatedMinutes = 45;
+  let dailyPacingLabel = '1-2 hours / day (Moderate)';
+
+  if (prepTimeStr.includes('<1') || prepTimeStr.includes('less') || prepTimeStr.includes('30 min')) {
+    defaultEstimatedMinutes = 30;
+    dailyPacingLabel = '<1 hour / day (Lightweight)';
+  } else if (prepTimeStr.includes('2-3') || prepTimeStr.includes('2 to 3')) {
+    defaultEstimatedMinutes = 60;
+    dailyPacingLabel = '2-3 hours / day (Concept + Practice + Revision)';
+  } else if (prepTimeStr.includes('3+') || prepTimeStr.includes('3-4') || prepTimeStr.includes('4+')) {
+    defaultEstimatedMinutes = 90;
+    dailyPacingLabel = '3+ hours / day (Deep Practice + Reinforcement)';
   }
 
-  // 4. Calculate Topic-Level Performance Metrics Map
+  // 2. Build Topic Statistics Map combining AttemptTrack, WeaknessAnalysis, and AssessmentAnalysis
   const topicStats = {};
 
-  // Aggregate AttemptTrack records by topic
+  // Initialize from Topic catalog
+  topics.forEach(t => {
+    const tId = t._id.toString();
+    topicStats[tId] = {
+      topicId: tId,
+      topicName: t.title || 'Topic',
+      category: t.category || t.subject || 'dsa',
+      totalAttempts: 0,
+      passedAttempts: 0,
+      failedAttempts: 0,
+      accuracy: null,
+      classification: 'UNATTEMPTED',
+      assessmentPriority: null,
+      isWeakInAssessment: false,
+      isStrongInAssessment: false,
+      repeatFailures: 0
+    };
+  });
+
+  // Aggregate AttemptTrack records
   attempts.forEach(att => {
     let topicId = null;
-    let topicName = 'General Topic';
-    let category = att.category || 'dsa';
-
     if (att.questionId && att.questionId.topicId) {
-      if (typeof att.questionId.topicId === 'object' && att.questionId.topicId._id) {
-        topicId = att.questionId.topicId._id.toString();
-        topicName = att.questionId.topicId.title || topicName;
+      topicId = typeof att.questionId.topicId === 'object' && att.questionId.topicId._id
+        ? att.questionId.topicId._id.toString()
+        : att.questionId.topicId.toString();
+    }
+
+    if (topicId && topicStats[topicId]) {
+      const stat = topicStats[topicId];
+      stat.totalAttempts++;
+      if (att.status === 'Accepted') {
+        stat.passedAttempts++;
       } else {
-        topicId = att.questionId.topicId.toString();
+        stat.failedAttempts++;
       }
-    }
-
-    if (!topicId && att.questionId && att.questionId.title) {
-      topicName = att.questionId.title;
-    }
-
-    const key = topicId || `${category}::${topicName}`;
-    if (!topicStats[key]) {
-      topicStats[key] = {
-        topicId,
-        topicName,
-        category,
-        totalAttempts: 0,
-        passedAttempts: 0,
-        failedAttempts: 0,
-        accuracy: 0,
-        highWeakness: false,
-        mediumWeakness: false
-      };
-    }
-
-    topicStats[key].totalAttempts += 1;
-    if (att.status === 'Accepted') {
-      topicStats[key].passedAttempts += 1;
-    } else {
-      topicStats[key].failedAttempts += 1;
     }
   });
 
-  // Calculate accuracy
+  // Calculate attempt-based accuracy
   Object.values(topicStats).forEach(stat => {
-    stat.accuracy = Math.round((stat.passedAttempts / stat.totalAttempts) * 100);
+    if (stat.totalAttempts > 0) {
+      stat.accuracy = Math.round((stat.passedAttempts / stat.totalAttempts) * 100);
+    }
   });
 
-  // Merge WeaknessAnalysis records into topicStats
-  if (Array.isArray(weaknesses)) {
-    weaknesses.forEach(w => {
-      const topicId = w.topicId?._id ? w.topicId._id.toString() : (w.topicId ? w.topicId.toString() : null);
-      const category = w.category || w.topicId?.category || 'dsa';
-      const key = topicId || `${category}::${w.topicId?.title || 'weak'}`;
-
-      if (!topicStats[key]) {
-        topicStats[key] = {
-          topicId,
-          topicName: w.topicId?.title || 'Weak Area',
-          category,
-          totalAttempts: w.failureCount || 0,
-          passedAttempts: 0,
-          failedAttempts: w.failureCount || 0,
-          accuracy: typeof w.accuracyPercentage === 'number' ? w.accuracyPercentage : 30,
-          highWeakness: false,
-          mediumWeakness: false
-        };
+  // Merge WeaknessAnalysis records
+  weaknesses.forEach(w => {
+    const tId = w.topicId?._id ? w.topicId._id.toString() : (w.topicId ? w.topicId.toString() : null);
+    if (tId && topicStats[tId]) {
+      const stat = topicStats[tId];
+      stat.repeatFailures = Math.max(stat.repeatFailures, w.failureCount || 0);
+      if (typeof w.accuracyPercentage === 'number' && stat.accuracy === null) {
+        stat.accuracy = w.accuracyPercentage;
       }
+    }
+  });
 
-      const acc = typeof w.accuracyPercentage === 'number' ? w.accuracyPercentage : topicStats[key].accuracy;
-      if (acc < 40 || w.severity === 'High' || (w.failureCount || 0) >= 3) {
-        topicStats[key].highWeakness = true;
-      } else if (acc < 60 || w.severity === 'Medium') {
-        topicStats[key].mediumWeakness = true;
-      }
-    });
-  }
-
-  // Merge LearnerProfile weaknessVector if present
-  if (profile && Array.isArray(profile.weaknessVector)) {
-    profile.weaknessVector.forEach(w => {
-      const topicId = w.topicId ? w.topicId.toString() : null;
-      if (topicId && topicStats[topicId]) {
-        if ((w.errorCount || 0) >= 3) {
-          topicStats[topicId].highWeakness = true;
+  // Merge AssessmentAnalysis snapshots if present
+  if (latestAnalysis) {
+    if (Array.isArray(latestAnalysis.strongTopics)) {
+      latestAnalysis.strongTopics.forEach(st => {
+        const tId = st.topicId ? st.topicId.toString() : null;
+        if (tId && topicStats[tId]) {
+          topicStats[tId].isStrongInAssessment = true;
+          if (topicStats[tId].accuracy === null) topicStats[tId].accuracy = st.accuracy;
         }
-      }
-    });
+      });
+    }
+
+    if (Array.isArray(latestAnalysis.weakTopics)) {
+      latestAnalysis.weakTopics.forEach(wt => {
+        const tId = wt.topicId ? wt.topicId.toString() : null;
+        if (tId && topicStats[tId]) {
+          topicStats[tId].isWeakInAssessment = true;
+          topicStats[tId].assessmentPriority = wt.priority;
+          if (topicStats[tId].accuracy === null) topicStats[tId].accuracy = wt.accuracy;
+        }
+      });
+    }
   }
 
-  // Helper: Determine topic classification & adaptive guidance
-  const classifyTopic = (stat) => {
-    if (!stat || stat.totalAttempts === 0) {
-      return {
-        level: 'UNATTEMPTED',
-        priorityScore: 50,
-        activity: 'TARGETED_PRACTICE',
-        difficulty: 'Medium',
-        priorityLabel: 'Medium',
-        reason: 'Upcoming topic on your learning path.'
-      };
+  // Determine Classifications
+  Object.values(topicStats).forEach(stat => {
+    if (stat.isStrongInAssessment || (stat.accuracy !== null && stat.accuracy >= 80)) {
+      stat.classification = 'STRONG';
+    } else if (stat.isWeakInAssessment || (stat.accuracy !== null && stat.accuracy < 40) || stat.repeatFailures >= 3) {
+      stat.classification = 'CRITICAL';
+    } else if (stat.accuracy !== null && stat.accuracy < 60) {
+      stat.classification = 'WEAK';
+    } else if (stat.accuracy !== null && stat.accuracy < 80) {
+      stat.classification = 'DEVELOPING';
+    }
+  });
+
+  // Helper: Classify guidance per topic
+  const classifyTopicGuidance = (stat) => {
+    let priorityScore = 50;
+    let priority = 'Medium';
+    let activity = 'TARGETED_PRACTICE';
+    let difficulty = 'Medium';
+    let reason = 'Sequential learning node.';
+
+    if (stat.classification === 'CRITICAL') {
+      priorityScore = 90;
+      priority = 'High';
+      activity = 'EASIER_PRACTICE';
+      difficulty = 'Easy';
+      reason = stat.isWeakInAssessment
+        ? `Assessment identified low accuracy (${stat.accuracy ?? 35}%). Master basic patterns before advancing.`
+        : `Critical weakness with repeated failures. Fundamental review recommended.`;
+    } else if (stat.classification === 'WEAK') {
+      priorityScore = 75;
+      priority = 'High';
+      activity = 'WEAK_TOPIC_REVISION';
+      difficulty = 'Easy';
+      reason = `Moderate assessment/practice accuracy (${stat.accuracy}%). Focused guided practice recommended.`;
+    } else if (stat.classification === 'DEVELOPING') {
+      priorityScore = 60;
+      priority = 'Medium';
+      activity = 'TARGETED_PRACTICE';
+      difficulty = 'Medium';
+      reason = `Progressing steadily (${stat.accuracy}% accuracy). Solve Medium problems to gain full mastery.`;
+    } else if (stat.classification === 'STRONG') {
+      priorityScore = 40;
+      priority = 'Low';
+      activity = 'HARDER_PRACTICE';
+      difficulty = 'Hard';
+      reason = `Strong performance demonstrated (${stat.accuracy}% accuracy). Recommended for periodic revision and Hard challenges.`;
     }
 
-    const { accuracy, totalAttempts, highWeakness, mediumWeakness, failedAttempts } = stat;
-
-    // RULE 1: VERY WEAK TOPIC
-    if (accuracy < 40 || highWeakness || failedAttempts >= 3) {
-      return {
-        level: 'VERY_WEAK',
-        priorityScore: 90,
-        activity: 'EASIER_PRACTICE',
-        difficulty: 'Easy',
-        priorityLabel: 'High',
-        reason: `Low accuracy (${accuracy}%) with ${failedAttempts} failed attempt(s). Focus on Easy concept revision.`
-      };
+    // Adjust for Target Date urgency
+    if (daysRemaining !== null && daysRemaining <= 30) {
+      if (priority === 'Critical' || priority === 'High') {
+        priorityScore = Math.min(100, priorityScore + 10);
+        reason += ` [Urgent: Target date in ${daysRemaining} days]`;
+      }
     }
 
-    // RULE 2: WEAK / DEVELOPING TOPIC
-    if (accuracy < 60 || mediumWeakness) {
-      return {
-        level: 'WEAK',
-        priorityScore: 75,
-        activity: 'WEAK_TOPIC_REVISION',
-        difficulty: 'Easy',
-        priorityLabel: 'High',
-        reason: `Moderate accuracy (${accuracy}%). Concept notes revision and guided practice recommended.`
-      };
-    }
-
-    // RULE 3: DEVELOPING TOPIC
-    if (accuracy < 80) {
-      return {
-        level: 'DEVELOPING',
-        priorityScore: 60,
-        activity: 'TARGETED_PRACTICE',
-        difficulty: 'Medium',
-        priorityLabel: 'Medium',
-        reason: `Progressing steadily (${accuracy}% accuracy). Solve Medium practice problems to boost mastery.`
-      };
-    }
-
-    // RULE 4: MASTERED TOPIC
-    if (accuracy >= 85 && totalAttempts >= 5 && !highWeakness && !mediumWeakness) {
-      return {
-        level: 'MASTERED',
-        priorityScore: 20,
-        activity: 'MAINTENANCE',
-        difficulty: 'Hard',
-        priorityLabel: 'Low',
-        reason: `High mastery demonstrated (${accuracy}% accuracy across ${totalAttempts} attempts). Topic is mastered.`
-      };
-    }
-
-    // RULE 5: STRONG TOPIC
-    return {
-      level: 'STRONG',
-      priorityScore: 40,
-      activity: 'HARDER_PRACTICE',
-      difficulty: 'Hard',
-      priorityLabel: 'Low',
-      reason: `Strong accuracy (${accuracy}% across ${totalAttempts} attempts). Attempt Hard practice challenges.`
-    };
+    return { priorityScore, priority, activity, difficulty, reason };
   };
 
-  // 5. Update Existing Roadmap Nodes Safely
+  // 3. Assemble or update Roadmap document
+  let roadmapDoc = existingRoadmap;
   let nodesChanged = false;
 
-  const updatedNodes = (roadmapDoc.nodes || []).map(node => {
-    // Preserve completed historical tasks
-    if (node.status === 'completed') {
-      return node;
-    }
+  let nodesToProcess = [];
 
-    const tId = node.topicId ? node.topicId.toString() : null;
-    const stat = tId ? topicStats[tId] : null;
+  if (roadmapDoc && Array.isArray(roadmapDoc.nodes) && roadmapDoc.nodes.length > 0) {
+    // Preserve existing roadmap node structure!
+    nodesToProcess = roadmapDoc.nodes.map(n => {
+      const tId = n.topicId?._id ? n.topicId._id.toString() : (n.topicId ? n.topicId.toString() : null);
+      const stat = tId ? topicStats[tId] : null;
+      const guidance = stat ? classifyTopicGuidance(stat) : {
+        priorityScore: n.priorityScore || 50,
+        priority: n.priority || 'Medium',
+        activity: n.recommendedActivity || 'TARGETED_PRACTICE',
+        difficulty: n.recommendedDifficulty || 'Medium',
+        reason: n.adaptiveReason || n.reason || 'Starter topic on your learning path.'
+      };
 
-    if (!stat && !hasPerformanceData) {
-      return node; // No changes if no performance data for this topic
-    }
+      const nodeEstMins = defaultEstimatedMinutes;
+      const nodeEstHours = Number((nodeEstMins / 60).toFixed(1));
 
-    const guidance = classifyTopic(stat);
+      return {
+        nodeId: n.nodeId,
+        topicId: n.topicId,
+        topicName: n.topicName || (n.topicId && typeof n.topicId === 'object' ? n.topicId.title : n.nodeId),
+        subject: n.subject || (n.topicId && typeof n.topicId === 'object' ? n.topicId.category : 'dsa'),
+        status: n.status || 'locked',
+        priority: guidance.priority,
+        priorityScore: guidance.priorityScore,
+        estimatedHours: nodeEstHours,
+        estimatedMinutes: nodeEstMins,
+        recommendedActivity: guidance.activity,
+        recommendedDifficulty: guidance.difficulty,
+        adaptiveReason: guidance.reason,
+        reason: guidance.reason,
+        source: n.source || 'INITIAL'
+      };
+    });
 
-    // Check if priority or guidance actually changed to prevent thrashing
-    if (
-      node.priorityScore !== guidance.priorityScore ||
-      node.recommendedActivity !== guidance.activity ||
-      node.recommendedDifficulty !== guidance.difficulty ||
-      node.adaptiveReason !== guidance.reason
-    ) {
-      nodesChanged = true;
-      node.priorityScore = guidance.priorityScore;
-      node.recommendedActivity = guidance.activity;
-      node.recommendedDifficulty = guidance.difficulty;
-      node.adaptiveReason = guidance.reason;
-    }
+    // Also add any new topic from catalog if performance data exists for it and it's missing from existing roadmap
+    const existingTopicSet = new Set(
+      roadmapDoc.nodes.map(n => (n.topicId?._id ? n.topicId._id.toString() : (n.topicId ? n.topicId.toString() : null))).filter(Boolean)
+    );
 
-    // Unlock logic: If a topic becomes STRONG or MASTERED and status is in_progress, keep in_progress or complete
-    if (guidance.level === 'MASTERED' && node.status === 'in_progress') {
-      node.status = 'completed';
-      nodesChanged = true;
-    }
+    Object.values(topicStats).forEach(stat => {
+      if (stat.topicId && !existingTopicSet.has(stat.topicId) && (stat.totalAttempts > 0 || stat.isWeakInAssessment || stat.isStrongInAssessment)) {
+        const guidance = classifyTopicGuidance(stat);
+        existingTopicSet.add(stat.topicId);
+        nodesToProcess.push({
+          nodeId: `node-${stat.topicId}`,
+          topicId: stat.topicId,
+          topicName: stat.topicName,
+          subject: stat.category,
+          status: 'in_progress',
+          priority: guidance.priority,
+          priorityScore: guidance.priorityScore,
+          estimatedHours: Number((defaultEstimatedMinutes / 60).toFixed(1)),
+          estimatedMinutes: defaultEstimatedMinutes,
+          recommendedActivity: guidance.activity,
+          recommendedDifficulty: guidance.difficulty,
+          adaptiveReason: guidance.reason,
+          reason: guidance.reason,
+          source: latestAnalysis ? 'ASSESSMENT' : 'PRACTICE'
+        });
+      }
+    });
 
-    return node;
+  } else {
+    // Generate new initial roadmap from topics catalog
+    const topicList = topics.length > 0 ? topics : Object.values(topicStats);
+    nodesToProcess = topicList.map(t => {
+      const tId = t._id ? t._id.toString() : t.topicId;
+      const stat = topicStats[tId] || {
+        topicId: tId,
+        topicName: t.title || 'Topic',
+        category: t.category || t.subject || 'dsa',
+        classification: 'UNATTEMPTED'
+      };
+
+      const guidance = classifyTopicGuidance(stat);
+      const nodeEstMins = defaultEstimatedMinutes;
+      const nodeEstHours = Number((nodeEstMins / 60).toFixed(1));
+
+      return {
+        nodeId: `node-${tId}`,
+        topicId: t._id || tId,
+        topicName: t.title || stat.topicName || 'Topic',
+        subject: t.category || t.subject || stat.category || 'dsa',
+        status: 'locked',
+        priority: guidance.priority,
+        priorityScore: guidance.priorityScore,
+        estimatedHours: nodeEstHours,
+        estimatedMinutes: nodeEstMins,
+        recommendedActivity: guidance.activity,
+        recommendedDifficulty: guidance.difficulty,
+        adaptiveReason: guidance.reason,
+        reason: guidance.reason,
+        source: latestAnalysis ? 'ASSESSMENT' : (attempts.length > 0 ? 'PRACTICE' : 'INITIAL')
+      };
+    });
+  }
+
+  // Sort nodes dynamically according to personalized priority score descending
+  nodesToProcess.sort((a, b) => b.priorityScore - a.priorityScore);
+
+  // Assign sequence numbers after sorting
+  nodesToProcess.forEach((node, idx) => {
+    node.sequence = idx + 1;
   });
 
-  // Check if any locked node should unlock if previous nodes are completed/mastered
-  const hasInProgress = updatedNodes.some(n => n.status === 'in_progress');
-  if (!hasInProgress) {
-    const firstLocked = updatedNodes.find(n => n.status === 'locked');
-    if (firstLocked) {
-      firstLocked.status = 'in_progress';
-      nodesChanged = true;
+  // Unlock logic: Ensure at least one node is in_progress / CURRENT if no node is active
+  const hasActiveNode = nodesToProcess.some(n => n.status === 'in_progress' || n.status === 'CURRENT');
+  if (!hasActiveNode && nodesToProcess.length > 0) {
+    const firstUncompleted = nodesToProcess.find(n => !['completed', 'COMPLETED', 'SKIPPED'].includes(n.status));
+    if (firstUncompleted) {
+      firstUncompleted.status = 'in_progress';
     }
   }
 
-  roadmapDoc.nodes = updatedNodes;
-
-  // 6. Save if changes occurred or if forceRecalculate requested
-  if (nodesChanged || forceRecalculate || !existingRoadmap) {
+  if (!roadmapDoc) {
+    roadmapDoc = new Roadmap({
+      userId,
+      nodes: nodesToProcess,
+      lastGeneratedAt: new Date(),
+      version: 1
+    });
+    nodesChanged = true;
+  } else {
+    roadmapDoc.nodes = nodesToProcess;
     roadmapDoc.lastGeneratedAt = new Date();
-    if (existingRoadmap) {
-      roadmapDoc.version = (roadmapDoc.version || 1) + 1;
-    }
-    await roadmapDoc.save();
+    roadmapDoc.version = (roadmapDoc.version || 1) + 1;
+    nodesChanged = true;
   }
 
-  // 7. Calculate Sensible `nextAction`
-  let nextAction = null;
-  const activeNodes = (roadmapDoc.nodes || []).filter(n => n.status === 'in_progress' || n.status === 'locked');
+  await roadmapDoc.save();
 
-  // Sort active nodes by priorityScore descending to select next action
-  const sortedActive = [...activeNodes].sort((a, b) => (b.priorityScore || 0) - (a.priorityScore || 0));
-
-  if (sortedActive.length > 0) {
-    const topNode = sortedActive[0];
-    const tId = topNode.topicId ? topNode.topicId.toString() : null;
-    const stat = tId ? topicStats[tId] : null;
-    const guidance = classifyTopic(stat);
-
-    // Fetch topic title if populated or available
-    let topicName = stat?.topicName || 'DSA & Algorithms';
-    let category = stat?.category || 'dsa';
-
-    if (topNode.topicId && typeof topNode.topicId === 'object' && topNode.topicId.title) {
-      topicName = topNode.topicId.title;
-      category = topNode.topicId.category || category;
-    }
-
-    nextAction = {
-      category,
-      topicName,
-      activityType: topNode.recommendedActivity || guidance.activity,
-      difficulty: topNode.recommendedDifficulty || guidance.difficulty,
-      priority: guidance.priorityLabel,
-      reason: topNode.adaptiveReason || guidance.reason
-    };
-  }
-
-  // 8. Populate Roadmap Nodes for Return
+  // Populate topic details for clean response return
   const populatedRoadmap = await Roadmap.findById(roadmapDoc._id)
     .populate('nodes.topicId', 'title category difficulty subject')
     .select('-__v')
     .lean();
 
-  const summaryReason = nodesChanged || forceRecalculate
-    ? `Roadmap priorities updated dynamically based on ${attempts.length} practice attempts and ${weaknesses.length} identified weak areas.`
-    : 'Roadmap is up-to-date with your current learning progress.';
+  // 4. Calculate Sensible Summary & Current Learning Item
+  const activeNode = (populatedRoadmap.nodes || []).find(n => n.status === 'in_progress' || n.status === 'CURRENT') || populatedRoadmap.nodes[0] || null;
+
+  const currentLearningObj = activeNode ? {
+    nodeId: activeNode.nodeId,
+    topicName: activeNode.topicName || activeNode.topicId?.title || 'Starter Topic',
+    subject: activeNode.subject || activeNode.topicId?.category || 'dsa',
+    priority: activeNode.priority || 'Medium',
+    recommendedActivity: activeNode.recommendedActivity,
+    recommendedDifficulty: activeNode.recommendedDifficulty,
+    reason: activeNode.adaptiveReason || activeNode.reason,
+    estimatedMinutes: activeNode.estimatedMinutes || defaultEstimatedMinutes
+  } : null;
+
+  const adaptiveSummary = {
+    updated: nodesChanged || forceRecalculate,
+    reason: `Roadmap personalized using student performance, ${latestAnalysis ? 'assessment results' : 'practice history'}, daily capacity (${dailyPacingLabel}), and target date.`,
+    dailyPreparationTime: dailyPacingLabel,
+    daysRemainingTargetDate: daysRemaining,
+    currentLearningItem: currentLearningObj,
+    nextAction: currentLearningObj,
+    totalNodes: (populatedRoadmap.nodes || []).length,
+    completedNodesCount: (populatedRoadmap.nodes || []).filter(n => ['completed', 'COMPLETED'].includes(n.status)).length,
+    inProgressNodesCount: (populatedRoadmap.nodes || []).filter(n => ['in_progress', 'CURRENT'].includes(n.status)).length,
+    upcomingNodesCount: (populatedRoadmap.nodes || []).filter(n => ['locked', 'NOT_STARTED'].includes(n.status)).length
+  };
 
   return {
     roadmap: populatedRoadmap,
-    adaptiveSummary: {
-      updated: nodesChanged || forceRecalculate,
-      reason: summaryReason,
-      nextAction
-    }
+    adaptiveSummary
   };
 };

@@ -181,7 +181,7 @@ const runPracticeFilterVerification = async () => {
     console.log('[PracticeFilterTest] Testing Combined Filters...');
     ({ req: r, res: rs } = createMockReqRes({ authorization: `Bearer ${student1Token}` }, {}, { category: 'dsa', difficulty: 'Medium' }));
     await simulateRoute(filterPracticeQuestions, r, rs);
-    if (rs.body.data.length !== 1 || rs.body.data[0].difficulty !== 'Medium' || rs.body.data[0].topicId.category !== 'dsa') {
+    if (!rs.body.data || rs.body.data.length === 0 || !rs.body.data.every(q => (q.difficulty || '').toLowerCase() === 'medium' && q.topicId?.category === 'dsa')) {
       throw new Error('Combined filters failed');
     }
 

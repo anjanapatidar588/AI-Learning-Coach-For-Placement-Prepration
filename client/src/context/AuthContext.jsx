@@ -4,83 +4,90 @@ import API from '../services/api';
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      try {
-        return JSON.parse(savedUser);
-      } catch (e) {
-        // fallback to default demo user
-      }
-    }
-    return {
-      id: 'u-student-1',
-      name: 'Alex Johnson',
-      email: 'alex.student@placementcoach.ai',
-      role: localStorage.getItem('demoRole') || 'student',
-      targetCompanies: ['Google', 'Amazon', 'TCS'],
-      targetRole: 'Software Development Engineer (SDE-1)'
-    };
-  });
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(() => localStorage.getItem('token') || null);
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState(null);
 
-  const [token, setToken] = useState(() => localStorage.getItem('token') || 'demo_jwt_token_2026');
-  const [loading, setLoading] = useState(false);
-
+  // Restore authenticated session from backend on mount or refresh
   useEffect(() => {
-    if (user?.role) {
-      localStorage.setItem('demoRole', user.role);
-    }
-    if (user) {
-      localStorage.setItem('user', JSON.stringify(user));
-    }
-  }, [user]);
+    const initializeAuth = async () => {
+      const storedToken = localStorage.getItem('token');
+      if (!storedToken) {
+        setUser(null);
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
 
-  const switchRole = (newRole) => {
-    localStorage.setItem('demoRole', newRole);
-    if (newRole === 'admin') {
-      const adminUser = {
-        id: 'u-admin-1',
-        name: 'System Administrator',
-        email: 'admin@placementcoach.ai',
-        role: 'admin',
-        targetCompanies: [],
-        targetRole: 'Administrator'
-      };
-      setUser(adminUser);
-      localStorage.setItem('user', JSON.stringify(adminUser));
-    } else {
-      const studentUser = {
-        id: 'u-student-1',
-        name: 'Alex Johnson',
-        email: 'alex.student@placementcoach.ai',
-        role: 'student',
-        targetCompanies: ['Google', 'Amazon', 'TCS'],
-        targetRole: 'Software Development Engineer (SDE-1)'
-      };
-      setUser(studentUser);
-      localStorage.setItem('user', JSON.stringify(studentUser));
+      try {
+        const res = await API.get('/auth/me');
+        if (res.data?.success && res.data?.user) {
+          const authUser = res.data.user;
+          setUser(authUser);
+          localStorage.setItem('user', JSON.stringify(authUser));
+
+          if (authUser.role === 'student') {
+            await fetchProfile();
+          }
+        } else {
+          logout();
+        }
+      } catch (err) {
+        console.warn('Session verification failed, logging out:', err.response?.data?.message || err.message);
+        logout();
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      const res = await API.get('/student/profile');
+      if (res.data?.success && res.data?.data) {
+        setProfile(res.data.data);
+        return res.data.data;
+      }
+    } catch (err) {
+      // Profile might not exist yet or user is admin
     }
+    return null;
   };
 
+  /**
+   * Authoritative backend login.
+   * Derives user role strictly from backend DB response.
+   */
   const login = async (email, password) => {
     try {
       setLoading(true);
       const res = await API.post('/auth/login', { email, password });
-      const data = res.data?.data || res.data;
-      const userObj = data.user || data;
-      const tokenStr = data.token || res.data?.token;
+      const data = res.data;
 
-      if (tokenStr) {
-        setToken(tokenStr);
+      if (data?.success && data?.token && data?.user) {
+        const { token: tokenStr, user: userObj } = data;
+
         localStorage.setItem('token', tokenStr);
-      }
-      if (userObj) {
-        setUser(userObj);
         localStorage.setItem('user', JSON.stringify(userObj));
-        if (userObj.role) localStorage.setItem('demoRole', userObj.role);
+        setToken(tokenStr);
+        setUser(userObj);
+
+        if (userObj.role === 'student') {
+          await fetchProfile();
+        }
+
+        setLoading(false);
+        return { success: true, user: userObj, token: tokenStr };
       }
+
       setLoading(false);
-      return { success: true, user: userObj, token: tokenStr };
+      return {
+        success: false,
+        message: data?.message || 'Login failed. Invalid response from server.'
+      };
     } catch (err) {
       setLoading(false);
       return {
@@ -90,29 +97,49 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  /**
+   * User registration (Student or Admin).
+   * Directly supports role selection without admin key requirement.
+   */
   const register = async (userDataOrName, email, password, role = 'student') => {
     try {
       setLoading(true);
-      const payload = typeof userDataOrName === 'object'
-        ? userDataOrName
-        : { name: userDataOrName, email, password, role };
-
-      const res = await API.post('/auth/register', payload);
-      const data = res.data?.data || res.data;
-      const userObj = data.user || data;
-      const tokenStr = data.token || res.data?.token;
-
-      if (tokenStr) {
-        setToken(tokenStr);
-        localStorage.setItem('token', tokenStr);
+      let payload;
+      if (typeof userDataOrName === 'object') {
+        payload = { ...userDataOrName };
+      } else {
+        payload = { name: userDataOrName, email, password, role };
       }
-      if (userObj) {
-        setUser(userObj);
-        localStorage.setItem('user', JSON.stringify(userObj));
-        if (userObj.role) localStorage.setItem('demoRole', userObj.role);
+
+      // Ensure no admin key fields are sent
+      delete payload.adminKey;
+      delete payload.adminInviteCode;
+
+      const res = await API.post('/auth/signup', payload);
+      const data = res.data;
+
+      if (data?.success && data?.user) {
+        const { token: tokenStr, user: userObj } = data;
+
+        if (tokenStr) {
+          localStorage.setItem('token', tokenStr);
+          localStorage.setItem('user', JSON.stringify(userObj));
+          setToken(tokenStr);
+          setUser(userObj);
+          if (userObj.role === 'student') {
+            await fetchProfile();
+          }
+        }
+
+        setLoading(false);
+        return { success: true, user: userObj, token: tokenStr };
       }
+
       setLoading(false);
-      return { success: true, user: userObj, token: tokenStr };
+      return {
+        success: false,
+        message: data?.message || 'Registration failed.'
+      };
     } catch (err) {
       setLoading(false);
       return {
@@ -124,13 +151,16 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     setUser(null);
-    setToken('');
-    localStorage.removeItem('user');
+    setProfile(null);
+    setToken(null);
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('demoRole');
+    localStorage.removeItem('pathpilot_user');
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, switchRole }}>
+    <AuthContext.Provider value={{ user, token, profile, loading, login, register, logout, fetchProfile, setProfile }}>
       {children}
     </AuthContext.Provider>
   );

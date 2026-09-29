@@ -50,6 +50,33 @@ const questionSchema = new mongoose.Schema({
   },
   solutionExplanation: { type: String, default: '' },
   companyTags: [{ type: String }],
+
+  // Pattern Recognition Extensions (Step 5)
+  pattern: {
+    type: String,
+    enum: [
+      "TWO_POINTER",
+      "SLIDING_WINDOW",
+      "BINARY_SEARCH",
+      "HASHING",
+      "PREFIX_SUM",
+      "STACK",
+      "QUEUE",
+      "LINKED_LIST",
+      "TREE",
+      "GRAPH",
+      "GREEDY",
+      "DYNAMIC_PROGRAMMING",
+      "BACKTRACKING",
+      "SORTING",
+      "RECURSION",
+      "MATH",
+      "OTHER"
+    ],
+    default: null,
+    index: true
+  },
+  patternTags: [{ type: String }]
 }, { timestamps: true });
 
 export default mongoose.model('Question', questionSchema);

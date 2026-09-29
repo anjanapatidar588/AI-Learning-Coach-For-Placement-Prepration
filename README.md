@@ -1,3 +1,4 @@
+
 # AI Placement Coach
 
 A full-stack AI-powered placement preparation platform designed to help students master DSA, Aptitude, CS Core concepts, Mock Interviews, and Resume Optimization through personalized AI coaching.

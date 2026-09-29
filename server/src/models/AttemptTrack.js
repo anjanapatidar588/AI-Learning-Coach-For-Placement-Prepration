@@ -30,6 +30,7 @@ const attemptTrackSchema = new mongoose.Schema({
   timeSpentSeconds: { type: Number, default: 0, min: 0 },
   hintsUsedCount: { type: Number, default: 0, min: 0 },
   aiFeedbackSummary: { type: String, default: '' },
+  pattern: { type: String, default: null, index: true },
 }, { timestamps: true });
 
 export default mongoose.model('AttemptTrack', attemptTrackSchema);

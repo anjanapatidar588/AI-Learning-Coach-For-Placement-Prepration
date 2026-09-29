@@ -234,20 +234,20 @@ const TopicManagement = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="glass-panel p-6 rounded-2xl border border-purple-500/30 bg-gradient-to-r from-slate-900 via-purple-950/20 to-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="glass-panel p-6 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/80 via-purple-50/40 to-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400 flex items-center justify-center">
-            <FolderKanban className="w-6 h-6" />
+          <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+            <FolderKanban className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white tracking-tight">Topic & Syllabus Management</h1>
-            <p className="text-xs text-slate-400 mt-0.5">Manage learning topics across DSA, Aptitude, and CS Core modules.</p>
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">Topic & Syllabus Management</h1>
+            <p className="text-xs text-slate-500 mt-0.5">Manage learning topics across DSA, Aptitude, and CS Core modules.</p>
           </div>
         </div>
 
         <button
           onClick={handleOpenCreateModal}
-          className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold flex items-center justify-center space-x-2 shadow-lg shadow-purple-600/20 transition-all cursor-pointer shrink-0"
+          className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center justify-center space-x-2 shadow-xs transition-all cursor-pointer shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>Add New Topic</span>
@@ -256,31 +256,31 @@ const TopicManagement = () => {
 
       {/* Top Banner Alert */}
       {successMessage && (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center space-x-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center space-x-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>{successMessage}</span>
         </div>
       )}
 
       {error && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center space-x-2">
-          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center space-x-2">
+          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {/* Filter Bar */}
-      <div className="glass-panel p-4 rounded-2xl border border-slate-800">
+      <div className="glass-panel p-4 rounded-2xl border border-slate-200/80 bg-white">
         <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           {/* Search Input */}
           <div className="relative lg:col-span-2">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search topics by title or subject..."
-              className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-purple-500/50"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
             />
           </div>
 
@@ -289,7 +289,7 @@ const TopicManagement = () => {
             <select
               value={categoryFilter}
               onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
-              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-purple-500/50"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-indigo-500"
             >
               <option value="all">All Categories</option>
               <option value="dsa">DSA</option>
@@ -303,7 +303,7 @@ const TopicManagement = () => {
             <select
               value={difficultyFilter}
               onChange={(e) => { setDifficultyFilter(e.target.value); setPage(1); }}
-              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-purple-500/50"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-indigo-500"
             >
               <option value="all">All Difficulties</option>
               <option value="Easy">Easy</option>
@@ -316,15 +316,15 @@ const TopicManagement = () => {
           <div className="flex items-center space-x-2">
             <button
               type="submit"
-              className="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
+              className="flex-1 py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
             >
-              <Filter className="w-3.5 h-3.5 text-purple-400" />
+              <Filter className="w-3.5 h-3.5 text-indigo-300" />
               <span>Filter</span>
             </button>
             <button
               type="button"
               onClick={handleClearFilters}
-              className="py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 text-xs font-medium transition-colors cursor-pointer"
+              className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-medium transition-colors cursor-pointer"
             >
               Reset
             </button>
@@ -333,16 +333,16 @@ const TopicManagement = () => {
       </div>
 
       {/* Table Container */}
-      <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden">
+      <div className="glass-panel rounded-2xl border border-slate-200/80 bg-white overflow-hidden">
         {loading ? (
           <div className="py-16 flex flex-col items-center justify-center space-y-3">
-            <Loader2 className="w-7 h-7 text-purple-400 animate-spin" />
-            <p className="text-xs text-slate-400 font-mono">Loading topic bank...</p>
+            <Loader2 className="w-7 h-7 text-indigo-600 animate-spin" />
+            <p className="text-xs text-slate-500 font-medium">Loading topic bank...</p>
           </div>
         ) : topics.length === 0 ? (
           <div className="py-16 text-center space-y-3">
-            <FolderKanban className="w-10 h-10 text-slate-600 mx-auto" />
-            <h3 className="text-sm font-semibold text-slate-300">No topics found</h3>
+            <FolderKanban className="w-10 h-10 text-slate-300 mx-auto" />
+            <h3 className="text-sm font-semibold text-slate-800">No topics found</h3>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
               No learning topics matched your current filters or the topic database is empty.
             </p>
@@ -351,7 +351,7 @@ const TopicManagement = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-slate-800 bg-slate-900/60 text-slate-400 uppercase font-mono text-[10px]">
+                <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-500 uppercase font-semibold text-[10px]">
                   <th className="py-3 px-4">Topic Title</th>
                   <th className="py-3 px-4">Category</th>
                   <th className="py-3 px-4">Subject</th>
@@ -360,43 +360,43 @@ const TopicManagement = () => {
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 text-slate-300">
+              <tbody className="divide-y divide-slate-100 text-slate-700">
                 {topics.map((t) => (
-                  <tr key={t._id || t.id} className="hover:bg-slate-900/40 transition-colors">
-                    <td className="py-3.5 px-4 font-semibold text-slate-100 max-w-xs truncate">
+                  <tr key={t._id || t.id} className="hover:bg-slate-50/60 transition-colors">
+                    <td className="py-3.5 px-4 font-semibold text-slate-900 max-w-xs truncate">
                       {t.title || t.name}
                     </td>
                     <td className="py-3.5 px-4">
-                      <span className="px-2 py-0.5 rounded text-[10px] uppercase font-mono font-bold bg-purple-950/60 border border-purple-500/30 text-purple-300">
+                      <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-indigo-50 border border-indigo-100 text-indigo-700">
                         {CATEGORY_LABELS[t.category] || t.category}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 text-slate-400 font-medium">
+                    <td className="py-3.5 px-4 text-slate-600 font-medium">
                       {t.subject}
                     </td>
                     <td className="py-3.5 px-4">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        t.difficulty === 'Easy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                        t.difficulty === 'Medium' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                        'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                        t.difficulty === 'Easy' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                        t.difficulty === 'Medium' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                        'bg-rose-50 text-rose-700 border border-rose-200'
                       }`}>
                         {t.difficulty || 'Medium'}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 font-mono text-purple-300 font-semibold">
+                    <td className="py-3.5 px-4 text-indigo-700 font-semibold">
                       {typeof t.questionCount === 'number' ? `${t.questionCount} questions` : '0 questions'}
                     </td>
                     <td className="py-3.5 px-4 text-right space-x-1.5">
                       <button
                         onClick={() => handleOpenEditModal(t)}
-                        className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors cursor-pointer"
+                        className="p-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
                         title="Edit Topic"
                       >
                         <Edit className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleOpenDeleteModal(t)}
-                        className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition-colors cursor-pointer"
+                        className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors cursor-pointer"
                         title="Delete Topic"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -411,24 +411,24 @@ const TopicManagement = () => {
 
         {/* Pagination Footer */}
         {!loading && topics.length > 0 && (
-          <div className="px-4 py-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+          <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
             <div>
-              Showing Page <span className="font-bold text-white">{pagination.page}</span> of{' '}
-              <span className="font-bold text-white">{pagination.pages}</span> ({pagination.total} total topics)
+              Showing Page <span className="font-bold text-slate-800">{pagination.page}</span> of{' '}
+              <span className="font-bold text-slate-800">{pagination.pages}</span> ({pagination.total} total topics)
             </div>
 
             <div className="flex items-center space-x-2">
               <button
                 disabled={pagination.page <= 1}
                 onClick={() => setPage(prev => Math.max(1, prev - 1))}
-                className="p-1.5 rounded-lg bg-slate-800 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-200 transition-colors cursor-pointer"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button
                 disabled={pagination.page >= pagination.pages}
                 onClick={() => setPage(prev => Math.min(pagination.pages, prev + 1))}
-                className="p-1.5 rounded-lg bg-slate-800 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-200 transition-colors cursor-pointer"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>

@@ -19,8 +19,10 @@ const Register = () => {
     if (res.success) {
       if (res.user.role === 'admin') {
         navigate('/admin/dashboard');
-      } else {
+      } else if (res.profile && res.profile.onboardingCompleted) {
         navigate('/student/dashboard');
+      } else {
+        navigate('/student/onboarding');
       }
     } else {
       setError(res.message);

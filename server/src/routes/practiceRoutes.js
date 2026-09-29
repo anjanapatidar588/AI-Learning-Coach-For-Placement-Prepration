@@ -6,7 +6,9 @@ import { authorize } from '../middleware/roleMiddleware.js';
 const router = express.Router();
 
 router.use(protect);
+router.use(authorize('student'));
 
-router.get('/filter', authorize('student'), filterPracticeQuestions);
+router.get('/filter', filterPracticeQuestions);
 
 export default router;
+

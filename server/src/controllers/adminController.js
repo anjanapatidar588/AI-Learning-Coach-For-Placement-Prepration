@@ -7,6 +7,9 @@ import AttemptTrack from '../models/AttemptTrack.js';
 import LearnerProfile from '../models/LearnerProfile.js';
 import WeaknessAnalysis from '../models/WeaknessAnalysis.js';
 import Roadmap from '../models/Roadmap.js';
+import AssessmentBlueprint from '../models/AssessmentBlueprint.js';
+import PublishedAssessment from '../models/PublishedAssessment.js';
+import AssessmentAttempt from '../models/AssessmentAttempt.js';
 import { calculateReadinessScore } from '../services/readinessScoreService.js';
 
 // Admin Dashboard Analytics
@@ -169,9 +172,39 @@ export const getAdminDashboardStats = async (req, res) => {
       createdAt: att.createdAt
     }));
 
+    // Assessment & Topic Platform Totals
+    const totalAssessments = await AssessmentBlueprint.countDocuments();
+    const publishedAssessments = await PublishedAssessment.countDocuments({ status: 'PUBLISHED' });
+    const totalTopics = await Topic.countDocuments();
+
+    // Assessment Completion Rate
+    const totalAssessmentAttempts = await AssessmentAttempt.countDocuments();
+    const completedAssessmentAttempts = await AssessmentAttempt.countDocuments({ status: 'COMPLETED' });
+    const assessmentCompletionRate = totalAssessmentAttempts > 0
+      ? Math.round((completedAssessmentAttempts / totalAssessmentAttempts) * 100)
+      : (totalStudents > 0 ? Math.round((baselineCompleted / totalStudents) * 100) : 0);
+
     res.json({
       success: true,
       data: {
+        kpis: {
+          totalStudents,
+          activeStudents,
+          totalAssessments,
+          publishedAssessments,
+          totalQuestions,
+          totalTopics,
+          averageReadiness,
+          assessmentCompletionRate
+        },
+        assessments: {
+          total: totalAssessments,
+          published: publishedAssessments,
+          completionRate: assessmentCompletionRate
+        },
+        topics: {
+          total: totalTopics
+        },
         students: {
           total: totalStudents,
           active: activeStudents,

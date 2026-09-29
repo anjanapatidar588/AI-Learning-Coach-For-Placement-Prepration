@@ -12,11 +12,6 @@ API.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-
-  // Demo mode fallback role header
-  const activeRole = localStorage.getItem('demoRole') || 'student';
-  config.headers['x-mock-role'] = activeRole;
-
   return config;
 });
 
