@@ -14,7 +14,11 @@ import {
   updateAdminTopic,
   deleteAdminTopic,
   getAIConfigs,
-  updateAIConfig
+  updateAIConfig,
+  getAdminCompanies,
+  createAdminCompany,
+  updateAdminCompany,
+  deleteAdminCompany
 } from '../controllers/adminController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { authorize } from '../middleware/roleMiddleware.js';
@@ -88,5 +92,11 @@ router.delete('/questions/:questionId', deleteAdminQuestion);
 
 router.get('/ai-config', getAIConfigs);
 router.put('/ai-config/:id', updateAIConfig);
+
+// Company Management Routes
+router.get('/companies', getAdminCompanies);
+router.post('/companies', createAdminCompany);
+router.put('/companies/:companyId', updateAdminCompany);
+router.delete('/companies/:companyId', deleteAdminCompany);
 
 export default router;

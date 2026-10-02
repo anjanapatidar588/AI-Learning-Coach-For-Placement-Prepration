@@ -616,7 +616,8 @@ export const updateStudentProfile = async (req, res) => {
       preferredStudyTime,
       preparationDetails,
       targetDate,
-      onboardingCompleted
+      onboardingCompleted,
+      avatar
     } = req.body;
 
     let profile = await LearnerProfile.findOne({ userId });
@@ -686,15 +687,14 @@ export const updateStudentProfile = async (req, res) => {
 
     await profile.save();
 
-    if (name || targetCompanies) {
-      const userUpdates = {};
-      if (name) userUpdates.name = String(name).trim();
-      if (targetCompanies && Array.isArray(profile.targetCompanies)) {
-        userUpdates.targetCompanies = profile.targetCompanies;
-      }
-      if (Object.keys(userUpdates).length > 0) {
-        await User.findByIdAndUpdate(userId, userUpdates);
-      }
+    const userUpdates = {};
+    if (name) userUpdates.name = String(name).trim();
+    if (avatar !== undefined) userUpdates.avatar = String(avatar);
+    if (targetCompanies && Array.isArray(profile.targetCompanies)) {
+      userUpdates.targetCompanies = profile.targetCompanies;
+    }
+    if (Object.keys(userUpdates).length > 0) {
+      await User.findByIdAndUpdate(userId, userUpdates);
     }
 
     const user = await User.findById(userId).select('-passwordHash -__v');

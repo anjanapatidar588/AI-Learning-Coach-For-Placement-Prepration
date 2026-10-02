@@ -184,9 +184,9 @@ export const submitStudentAssessment = async (req, res) => {
         startedAt: new Date(Date.now() - 5 * 60 * 1000)
       });
     } else if (attempt.status === 'COMPLETED') {
-      return res.json({
-        success: true,
-        message: 'Assessment already completed',
+      return res.status(400).json({
+        success: false,
+        message: 'Assessment has already been submitted.',
         data: {
           assessmentId: assessment._id.toString(),
           attemptId: attempt._id.toString(),

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import API from '../../services/api';
+import AssessmentProcessingState from '../../components/common/AssessmentProcessingState';
 import {
   Sparkles,
   CheckCircle2,
@@ -180,7 +181,17 @@ export default function BaselineAssessment() {
     );
   }
 
-  // 2. ERROR SCREEN
+  // 2. SUBMITTING PROCESSING SCREEN
+  if (step === 'submitting') {
+    return (
+      <AssessmentProcessingState
+        currentStep={3}
+        message="Analyzing your preparation profile..."
+      />
+    );
+  }
+
+  // 3. ERROR SCREEN
   if (step === 'error') {
     return (
       <div className="max-w-xl mx-auto p-6 py-12">

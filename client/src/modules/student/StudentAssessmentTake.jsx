@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import API from '../../services/api';
+import AssessmentProcessingState from '../../components/common/AssessmentProcessingState';
 import {
   Clock,
   CheckCircle2,
@@ -163,6 +164,15 @@ const StudentAssessmentTake = () => {
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
+
+  if (submitting) {
+    return (
+      <AssessmentProcessingState
+        currentStep={3}
+        message="Analyzing your preparation profile..."
+      />
+    );
+  }
 
   if (loading) {
     return (

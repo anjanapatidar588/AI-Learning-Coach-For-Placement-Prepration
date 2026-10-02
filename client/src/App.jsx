@@ -1,15 +1,17 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
-import ProtectedRoute from './components/common/ProtectedRoute';
 
 // Public Pages
 import PathPilotLanding from './pages/PathPilotLanding';
+import HowItWorksPage from './pages/HowItWorksPage';
 import LoginPage from './pages/auth/LoginPage';
 import SignupPage from './pages/auth/SignupPage';
 
 // Layouts
 import StudentLayout from './layouts/StudentLayout';
+import OnboardingLayout from './layouts/OnboardingLayout';
+import AssessmentLayout from './layouts/AssessmentLayout';
 import AdminLayout from './layouts/AdminLayout';
 
 // Student Modules (Authentic Backend Data-driven)
@@ -50,6 +52,11 @@ import PlatformAnalytics from './modules/admin/PlatformAnalytics';
 
 import { useAuth } from './context/AuthContext';
 import { getStudentInitialRoute } from './utils/studentRouting';
+import ProtectedRoute, {
+  OnboardingGuard,
+  AssessmentGuard,
+  StudentAccessGuard
+} from './components/common/RouteGuards';
 
 function StudentIndexRedirect() {
   const { profile } = useAuth();
@@ -61,22 +68,51 @@ function AppRoutes() {
     <Routes>
       {/* 1. Public Routes */}
       <Route path="/" element={<PathPilotLanding />} />
+      <Route path="/how-it-works" element={<HowItWorksPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
 
-      {/* 2. Authenticated Student Isolated Space */}
+      {/* 2A. Student Onboarding Isolated Flow (No Application Sidebar) */}
+      <Route
+        path="/student/onboarding"
+        element={
+          <OnboardingGuard>
+            <OnboardingLayout />
+          </OnboardingGuard>
+        }
+      >
+        <Route index element={<StudentOnboarding />} />
+      </Route>
+
+      {/* 2B. Baseline Assessment Isolated Flow (Focused Assessment Layout) */}
       <Route
         path="/student"
         element={
-          <ProtectedRoute allowedRoles={['student']}>
+          <AssessmentGuard>
+            <AssessmentLayout />
+          </AssessmentGuard>
+        }
+      >
+        <Route path="assessment-ready" element={<AssessmentReady />} />
+        <Route path="assessment-ready/:assessmentId" element={<AssessmentReady />} />
+        <Route path="assessment/ready" element={<AssessmentReady />} />
+        <Route path="assessment/ready/:assessmentId" element={<AssessmentReady />} />
+        <Route path="assessment/:assessmentId" element={<AssessmentReady />} />
+        <Route path="assessments/take/:assessmentId" element={<StudentAssessmentTake />} />
+        <Route path="baseline-assessment" element={<BaselineAssessment />} />
+        <Route path="assessment/baseline" element={<BaselineAssessment />} />
+      </Route>
+
+      {/* 2C. Authenticated Unlocked Student Application (Full Sidebar StudentLayout) */}
+      <Route
+        path="/student"
+        element={
+          <StudentAccessGuard>
             <StudentLayout />
-          </ProtectedRoute>
+          </StudentAccessGuard>
         }
       >
         <Route index element={<StudentIndexRedirect />} />
-        <Route path="onboarding" element={<StudentOnboarding />} />
-        <Route path="assessment-ready" element={<AssessmentReady />} />
-        <Route path="assessment-ready/:assessmentId" element={<AssessmentReady />} />
         <Route path="dashboard" element={<StudentDashboard />} />
         <Route path="roadmap" element={<StudentRoadmap />} />
         <Route path="learn/:topicId" element={<StudentLearningExperience />} />
@@ -89,15 +125,8 @@ function AppRoutes() {
         <Route path="progress" element={<MyProgress />} />
         <Route path="weak-areas" element={<WeakAreas />} />
         <Route path="achievements" element={<Achievements />} />
-        {/* Assessment System Routes */}
         <Route path="assessment" element={<StudentAssessmentPortal />} />
         <Route path="assessments" element={<StudentAssessmentPortal />} />
-        <Route path="assessment/ready" element={<AssessmentReady />} />
-        <Route path="assessment/ready/:assessmentId" element={<AssessmentReady />} />
-        <Route path="assessment/:assessmentId" element={<AssessmentReady />} />
-        <Route path="assessments/take/:assessmentId" element={<StudentAssessmentTake />} />
-        <Route path="baseline-assessment" element={<BaselineAssessment />} />
-        <Route path="assessment/baseline" element={<BaselineAssessment />} />
         <Route path="ai-coach" element={<AICoach />} />
         <Route path="mock-interview" element={<MockInterview />} />
         <Route path="company-prep" element={<CompanyPrep />} />
@@ -149,7 +178,7 @@ function App() {
   return (
     <AuthProvider>
       <Router>
-        <div className="min-h-screen flex flex-col pathpilot-bg text-slate-100">
+        <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans selection:bg-indigo-500/20 selection:text-indigo-900">
           <div className="flex-1">
             <AppRoutes />
           </div>

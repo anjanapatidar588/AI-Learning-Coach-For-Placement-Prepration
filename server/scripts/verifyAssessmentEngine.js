@@ -367,10 +367,10 @@ const runVerification = async () => {
     console.log('[AssessmentEngineTest] 20. Testing Duplicate Submission Prevention...');
     ({ req: r, res: rs } = createMockReqRes({ authorization: `Bearer ${tokenA}` }, { answers: studentAnswers }, {}, { assessmentId: pubId }));
     await runRoute(submitStudentAssessment, r, rs, 'student');
-    if (rs.statusCode !== 200 || !rs.body.message.includes('already completed')) {
+    if (rs.statusCode !== 400 || !rs.body.message.toLowerCase().includes('already')) {
       throw new Error('Duplicate submission was not safely handled');
     }
-    console.log('PASS: Duplicate submission handled safely without double counting.');
+    console.log('PASS: Duplicate submission handled safely without double counting (HTTP 400 rejection).');
 
     // 22. Assessment result contains subject & topic performance
     console.log('[AssessmentEngineTest] 22. Testing Subject & Topic Performance Breakdown in Result...');

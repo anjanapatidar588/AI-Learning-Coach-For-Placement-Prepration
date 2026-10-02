@@ -1124,15 +1124,105 @@ export const deleteAdminTopic = async (req, res) => {
 // Export manageQuestions for backwards compatibility if needed
 export const manageQuestions = getAdminQuestions;
 
+// Company Management for Admin
+export const getAdminCompanies = async (req, res) => {
+  try {
+    const companies = await Company.find().sort({ name: 1 }).lean();
+    const companiesWithDetails = await Promise.all(
+      companies.map(async (c) => {
+        const taggedQuestionsCount = await Question.countDocuments({ companyTags: c.name });
+        return {
+          ...c,
+          id: c._id,
+          taggedQuestionsCount
+        };
+      })
+    );
+    res.json({ success: true, data: companiesWithDetails });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const createAdminCompany = async (req, res) => {
+  try {
+    const { name, logoUrl, description, hiringRounds, syllabus, cutoffBenchmark } = req.body;
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'Company name is required.' });
+    }
+
+    const existing = await Company.findOne({ name: name.trim() });
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'Company with this name already exists.' });
+    }
+
+    const company = await Company.create({
+      name: name.trim(),
+      logoUrl: logoUrl || '',
+      description: description || '',
+      hiringRounds: Array.isArray(hiringRounds) ? hiringRounds : [],
+      syllabus: Array.isArray(syllabus) ? syllabus : [],
+      cutoffBenchmark: typeof cutoffBenchmark === 'number' ? cutoffBenchmark : 75
+    });
+
+    res.status(201).json({ success: true, data: { ...company.toObject(), id: company._id, taggedQuestionsCount: 0 } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const updateAdminCompany = async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const company = await Company.findById(companyId);
+    if (!company) {
+      return res.status(404).json({ success: false, message: 'Company not found.' });
+    }
+
+    const { name, logoUrl, description, hiringRounds, syllabus, cutoffBenchmark } = req.body;
+    if (name) company.name = name.trim();
+    if (logoUrl !== undefined) company.logoUrl = logoUrl;
+    if (description !== undefined) company.description = description;
+    if (Array.isArray(hiringRounds)) company.hiringRounds = hiringRounds;
+    if (Array.isArray(syllabus)) company.syllabus = syllabus;
+    if (typeof cutoffBenchmark === 'number') company.cutoffBenchmark = cutoffBenchmark;
+
+    await company.save();
+    const taggedQuestionsCount = await Question.countDocuments({ companyTags: company.name });
+
+    res.json({
+      success: true,
+      data: { ...company.toObject(), id: company._id, taggedQuestionsCount }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const deleteAdminCompany = async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const company = await Company.findById(companyId);
+    if (!company) {
+      return res.status(404).json({ success: false, message: 'Company not found.' });
+    }
+
+    await Company.deleteOne({ _id: companyId });
+    res.json({ success: true, message: 'Company deleted successfully.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // AI Configuration Management
 export const getAIConfigs = async (req, res) => {
   try {
     const configs = [
-      { id: 'cfg-1', personaName: 'DSA Mentor', modelName: 'gemini-2.5-flash', temperature: 0.7, maxTokens: 1024, isActive: true },
-      { id: 'cfg-2', personaName: 'Aptitude Mentor', modelName: 'gemini-2.5-flash', temperature: 0.5, maxTokens: 800, isActive: true },
-      { id: 'cfg-3', personaName: 'CS Core Mentor', modelName: 'gemini-2.5-flash', temperature: 0.6, maxTokens: 1024, isActive: true },
-      { id: 'cfg-4', personaName: 'Interview Coach', modelName: 'gemini-2.5-flash', temperature: 0.8, maxTokens: 1200, isActive: true },
-      { id: 'cfg-5', personaName: 'Career Coach', modelName: 'gemini-2.5-flash', temperature: 0.7, maxTokens: 1024, isActive: true }
+      { id: 'cfg-1', personaName: 'DSA Mentor', modelName: 'gemini-1.5-pro', temperature: 0.7, maxTokens: 1024, isActive: true },
+      { id: 'cfg-2', personaName: 'Aptitude Mentor', modelName: 'gemini-1.5-flash', temperature: 0.5, maxTokens: 800, isActive: true },
+      { id: 'cfg-3', personaName: 'CS Core Mentor', modelName: 'gemini-1.5-pro', temperature: 0.6, maxTokens: 1024, isActive: true },
+      { id: 'cfg-4', personaName: 'Interview Coach', modelName: 'gemini-1.5-pro', temperature: 0.8, maxTokens: 1200, isActive: true },
+      { id: 'cfg-5', personaName: 'Career Coach', modelName: 'gemini-1.5-flash', temperature: 0.7, maxTokens: 1024, isActive: true }
     ];
     res.json({ success: true, data: configs });
   } catch (error) {
@@ -1148,3 +1238,4 @@ export const updateAIConfig = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+

@@ -28,7 +28,12 @@ import {
   getTopicPracticeQuestions,
   markTopicLearningComplete,
   recordStudentConfidence,
-  getIntelligentPracticeHelp
+  getIntelligentPracticeHelp,
+  generateTopicTeaching,
+  getAdaptiveQuestion,
+  evaluateAnswer,
+  evaluatePatternCheck,
+  updateTopicNote
 } from '../controllers/learningController.js';
 
 import {
@@ -90,6 +95,13 @@ router.get('/learning/topics/:topicId/practice', getTopicPracticeQuestions);
 router.post('/learning/topics/:topicId/complete', markTopicLearningComplete);
 router.post('/confidence', recordStudentConfidence);
 router.post('/learning/practice/intelligent-help', getIntelligentPracticeHelp);
+
+// Adaptive AI Tutor & Practice System Routes
+router.post('/learning/topics/:topicId/teach', generateTopicTeaching);
+router.post('/learning/topics/:topicId/adaptive-question', getAdaptiveQuestion);
+router.post('/learning/topics/:topicId/evaluate-answer', evaluateAnswer);
+router.post('/learning/topics/:topicId/pattern-check', evaluatePatternCheck);
+router.put('/learning/notes/:noteId', updateTopicNote);
 
 // Mistake Journal Routes (Step 6)
 router.post('/mistakes', createMistake);

@@ -6,7 +6,7 @@ import { authorize } from '../middleware/roleMiddleware.js';
 const router = express.Router();
 
 router.use(protect);
-router.use(authorize('student'));
+router.use(authorize('student', 'admin'));
 
 router.get('/', getCompanies);
 router.get('/:companyId', getCompanyDetail);

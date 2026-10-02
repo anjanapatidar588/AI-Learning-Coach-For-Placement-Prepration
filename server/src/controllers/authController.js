@@ -84,6 +84,7 @@ export const signupUser = async (req, res) => {
         role: user.role,
         targetCompanies: user.targetCompanies,
         targetRole: user.targetRole,
+        avatar: user.avatar || '',
         createdAt: user.createdAt,
       },
       profile: studentProfile
@@ -145,6 +146,7 @@ export const loginUser = async (req, res) => {
         role: user.role,
         targetCompanies: user.targetCompanies,
         targetRole: user.targetRole,
+        avatar: user.avatar || '',
       },
       profile
     });

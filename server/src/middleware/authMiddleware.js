@@ -4,7 +4,7 @@ import User from '../models/User.js';
 /**
  * Authentication middleware that verifies JWT Bearer token and attaches authoritative user context from DB
  */
-export const protect = async (req, res, next) => {
+export const protect = (req, res, next) => {
   let token;
 
   const authHeader = req.headers.authorization;
@@ -31,21 +31,13 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    const user = await User.findById(userId).select('-passwordHash');
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication failed. User no longer exists.'
-      });
-    }
-
-    // Attach authoritative database-derived user context
+    // Attach verified user context from cryptographically signed JWT
     req.user = {
-      userId: user._id.toString(),
-      id: user._id.toString(),
-      role: user.role,
-      name: user.name,
-      email: user.email
+      userId: userId.toString(),
+      id: userId.toString(),
+      role: decoded.role || 'student',
+      name: decoded.name || '',
+      email: decoded.email || ''
     };
 
     return next();
