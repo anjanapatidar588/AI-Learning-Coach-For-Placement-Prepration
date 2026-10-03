@@ -90,7 +90,7 @@ const StudentRoadmap = () => {
   const {
     nodes = [],
     learningMapBySubject = {},
-    overallProgressPercent = 21,
+    overallProgressPercent = 0,
     currentLearningItem,
     strongAreas = [],
     weakAreas = [],
@@ -99,111 +99,40 @@ const StudentRoadmap = () => {
     adaptiveSummary = {}
   } = roadmapData || {};
 
-  const completedCount = adaptiveSummary.completedNodesCount ?? nodes.filter(n => ['completed', 'COMPLETED'].includes(n.status)).length ?? 6;
-  const inProgressCount = adaptiveSummary.inProgressNodesCount ?? nodes.filter(n => ['in_progress', 'current', 'CURRENT', 'IN_PROGRESS'].includes(n.status)).length ?? 4;
-  const totalTopicsCount = adaptiveSummary.totalNodes || nodes.length || 28;
-  const upcomingCount = totalTopicsCount - (completedCount + inProgressCount);
-  const targetRoleName = studentContext.targetRole || user?.targetRole || 'Software Developer';
+  const completedCount = adaptiveSummary.completedNodesCount ?? nodes.filter(n => ['completed', 'COMPLETED'].includes(n.status)).length;
+  const inProgressCount = adaptiveSummary.inProgressNodesCount ?? nodes.filter(n => ['in_progress', 'current', 'CURRENT', 'IN_PROGRESS'].includes(n.status)).length;
+  const totalTopicsCount = adaptiveSummary.totalNodes || nodes.length;
+  const upcomingCount = Math.max(0, totalTopicsCount - (completedCount + inProgressCount));
+  const targetRoleName = studentContext.targetRole || user?.targetRole || 'Software Development';
 
-  // 6 Core Subject Columns Definition matching the reference image layout
-  const subjectColumns = [
-    {
-      key: 'dsa',
-      title: 'DSA',
-      icon: Code2,
-      color: 'from-indigo-500 to-purple-600',
-      iconBg: 'bg-indigo-100 text-indigo-600',
-      progressPct: 49,
-      topicsCount: '5 / 11 Topics',
-      items: [
-        { title: 'Arrays', status: 'completed', topicId: 'arrays' },
-        { title: 'Two Pointers', status: 'completed', topicId: 'two-pointers' },
-        { title: 'Sliding Window', status: 'in_progress', topicId: 'sliding-window' },
-        { title: 'Stack & Queue', status: 'upcoming', topicId: 'stack-queue' },
-        { title: 'Linked List', status: 'upcoming', topicId: 'linked-list' }
-      ]
-    },
-    {
-      key: 'aptitude',
-      title: 'Aptitude',
-      icon: BrainCircuit,
-      color: 'from-blue-500 to-cyan-600',
-      iconBg: 'bg-blue-100 text-blue-600',
-      progressPct: 20,
-      topicsCount: '2 / 10 Topics',
-      items: [
-        { title: 'Percentages', status: 'completed', topicId: 'percentages' },
-        { title: 'Profit & Loss', status: 'completed', topicId: 'profit-loss' },
-        { title: 'Time & Work', status: 'in_progress', topicId: 'time-work' },
-        { title: 'Ratio & Proportion', status: 'upcoming', topicId: 'ratio-proportion' },
-        { title: 'Logical Reasoning', status: 'upcoming', topicId: 'logical-reasoning' }
-      ]
-    },
-    {
-      key: 'dbms',
-      title: 'DBMS',
-      icon: Database,
-      color: 'from-cyan-500 to-teal-600',
-      iconBg: 'bg-cyan-100 text-cyan-600',
-      progressPct: 15,
-      topicsCount: '2 / 13 Topics',
-      items: [
-        { title: 'Introduction to DBMS', status: 'completed', topicId: 'intro-dbms' },
-        { title: 'ER Model', status: 'completed', topicId: 'er-model' },
-        { title: 'Normalization', status: 'in_progress', topicId: 'normalization' },
-        { title: 'SQL Queries', status: 'upcoming', topicId: 'sql-queries' },
-        { title: 'Joins & Subqueries', status: 'upcoming', topicId: 'joins-subqueries' }
-      ]
-    },
-    {
-      key: 'oops',
-      title: 'OOPS',
-      icon: Layers,
-      color: 'from-purple-500 to-pink-600',
-      iconBg: 'bg-purple-100 text-purple-600',
-      progressPct: 10,
-      topicsCount: '1 / 10 Topics',
-      items: [
-        { title: 'Classes & Objects', status: 'completed', topicId: 'classes-objects' },
-        { title: 'Constructors', status: 'in_progress', topicId: 'constructors' },
-        { title: 'Inheritance', status: 'upcoming', topicId: 'inheritance' },
-        { title: 'Polymorphism', status: 'upcoming', topicId: 'polymorphism' },
-        { title: 'Abstraction', status: 'upcoming', topicId: 'abstraction' }
-      ]
-    },
-    {
-      key: 'os',
-      title: 'OS',
-      icon: Cpu,
-      color: 'from-rose-500 to-amber-600',
-      iconBg: 'bg-rose-100 text-rose-600',
-      progressPct: 0,
-      topicsCount: '0 / 8 Topics',
-      items: [
-        { title: 'Process Management', status: 'upcoming', topicId: 'process-management' },
-        { title: 'Scheduling', status: 'upcoming', topicId: 'scheduling' },
-        { title: 'Memory Management', status: 'upcoming', topicId: 'memory-management' },
-        { title: 'File System', status: 'upcoming', topicId: 'file-system' },
-        { title: 'Deadlocks', status: 'upcoming', topicId: 'deadlocks' }
-      ]
-    },
-    {
-      key: 'cn',
-      title: 'CN',
-      icon: Network,
-      color: 'from-emerald-500 to-teal-600',
-      iconBg: 'bg-emerald-100 text-emerald-600',
-      progressPct: 0,
-      topicsCount: '0 / 8 Topics',
-      items: [
-        { title: 'OSI Model', status: 'upcoming', topicId: 'osi-model' },
-        { title: 'TCP/IP', status: 'upcoming', topicId: 'tcp-ip' },
-        { title: 'IP Addressing', status: 'upcoming', topicId: 'ip-addressing' },
-        { title: 'DNS', status: 'upcoming', topicId: 'dns' },
-        { title: 'Routing', status: 'upcoming', topicId: 'routing' }
-      ]
-    }
+  // Build subject columns dynamically from actual backend roadmap nodes / learningMapBySubject
+  const subjectKeys = [
+    { key: 'dsa', title: 'DSA', icon: Code2, color: 'from-indigo-500 to-purple-600', iconBg: 'bg-indigo-100 text-indigo-600' },
+    { key: 'aptitude', title: 'Aptitude', icon: BrainCircuit, color: 'from-blue-500 to-cyan-600', iconBg: 'bg-blue-100 text-blue-600' },
+    { key: 'dbms', title: 'DBMS', icon: Database, color: 'from-amber-500 to-orange-600', iconBg: 'bg-amber-100 text-amber-600' },
+    { key: 'oops', title: 'OOPS', icon: Layers, color: 'from-purple-500 to-pink-600', iconBg: 'bg-purple-100 text-purple-600' },
+    { key: 'os', title: 'Operating Systems', icon: Cpu, color: 'from-rose-500 to-red-600', iconBg: 'bg-rose-100 text-rose-600' },
+    { key: 'cn', title: 'Computer Networks', icon: Network, color: 'from-cyan-500 to-teal-600', iconBg: 'bg-cyan-100 text-cyan-600' },
   ];
+
+  const subjectColumns = subjectKeys.map(subj => {
+    const rawItems = learningMapBySubject[subj.key] || nodes.filter(n => (n.subject || n.category || '').toLowerCase() === subj.key);
+    const items = rawItems.map(node => ({
+      title: node.topicName || node.topicId?.title || node.title || node.nodeId,
+      status: node.status === 'completed' ? 'completed' : ['in_progress', 'current', 'CURRENT', 'IN_PROGRESS'].includes(node.status) ? 'in_progress' : 'upcoming',
+      topicId: node.topicId?._id || node.topicId || node.nodeId
+    }));
+    const done = items.filter(i => i.status === 'completed').length;
+    const total = items.length;
+    const progressPct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+    return {
+      ...subj,
+      progressPct,
+      topicsCount: total > 0 ? `${done} / ${total} Topics` : '0 Topics',
+      items
+    };
+  });
 
   // Map real backend nodes into subject columns if nodes exist
   if (nodes.length > 0) {

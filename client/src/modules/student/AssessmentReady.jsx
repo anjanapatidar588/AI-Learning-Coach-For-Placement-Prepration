@@ -45,36 +45,34 @@ const AssessmentReady = () => {
         setProfile(profileRes.data.data);
       }
 
-      // 2. Fetch Published Assessments from Admin Assessment Engine
-      const assListRes = await API.get('/student/assessments');
-      if (assListRes.data?.success && Array.isArray(assListRes.data?.data)) {
-        const publishedList = assListRes.data.data;
-        setAssessments(publishedList);
-
-        if (publishedList.length > 0) {
-          let chosen = null;
-          if (assessmentId) {
-            chosen = publishedList.find(a => a.assessmentId === assessmentId || a._id === assessmentId);
-          }
-          // Default to the latest published assessment
-          if (!chosen) {
-            chosen = publishedList[0];
-          }
-
-          // Fetch full safe details for the chosen assessment
-          const targetId = chosen.assessmentId || chosen._id;
-          const detailRes = await API.get(`/student/assessments/${targetId}`);
-          if (detailRes.data?.success && detailRes.data?.data) {
-            setAssessment(detailRes.data.data);
+      // 2. Fetch Published Initial Baseline Assessment from Admin Assessment Engine
+      const baselineRes = await API.get('/student/assessment/baseline').catch(() => null);
+      if (baselineRes?.data?.success && baselineRes?.data?.data) {
+        setAssessment(baselineRes.data.data);
+        setAssessments([baselineRes.data.data]);
+      } else {
+        // Fallback check published assessments list for assessmentPurpose === 'INITIAL_BASELINE'
+        const assListRes = await API.get('/student/assessments').catch(() => null);
+        if (assListRes?.data?.success && Array.isArray(assListRes.data?.data)) {
+          const publishedList = assListRes.data.data;
+          const baselineDoc = publishedList.find(a => a.assessmentPurpose === 'INITIAL_BASELINE');
+          if (baselineDoc) {
+            const detailRes = await API.get(`/student/assessments/${baselineDoc.assessmentId || baselineDoc._id}`);
+            if (detailRes.data?.success && detailRes.data?.data) {
+              setAssessment(detailRes.data.data);
+              setAssessments([detailRes.data.data]);
+            } else {
+              setAssessment(null);
+              setAssessments([]);
+            }
           } else {
-            setAssessment(chosen);
+            setAssessment(null);
+            setAssessments([]);
           }
         } else {
+          setAssessments([]);
           setAssessment(null);
         }
-      } else {
-        setAssessments([]);
-        setAssessment(null);
       }
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to load assessment information');

@@ -29,27 +29,16 @@ export default function StudentDashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      setLoading(false);
+      setLoading(true);
       const res = await API.get('/student/dashboard');
       if (res.data.success) {
         setData(res.data.data);
       }
     } catch (err) {
+      console.error('Failed to load dashboard data:', err);
+      setData(null);
+    } finally {
       setLoading(false);
-      // Fallback data
-      setData({
-        profile: { readinessScore: 74, currentStreak: 5, totalProblemsSolved: 28 },
-        roadmap: [
-          { nodeId: 'n-1', title: 'Arrays & Two Pointers', category: 'dsa', status: 'in_progress', priorityScore: 10 },
-          { nodeId: 'n-2', title: 'Percentages & Profit Loss', category: 'aptitude', status: 'in_progress', priorityScore: 9 },
-          { nodeId: 'n-3', title: 'DBMS Fundamentals & SQL', category: 'cs_core', status: 'locked', priorityScore: 8 },
-          { nodeId: 'n-4', title: 'Binary Trees & BFS/DFS', category: 'dsa', status: 'locked', priorityScore: 8 }
-        ],
-        recentAttempts: [
-          { id: 'att-1', questionTitle: 'Two Sum', category: 'dsa', status: 'Accepted', time: '2 hours ago' },
-          { id: 'att-2', questionTitle: 'Time & Work Efficiency', category: 'aptitude', status: 'Accepted', time: 'Yesterday' }
-        ]
-      });
     }
   };
 
@@ -65,10 +54,14 @@ export default function StudentDashboard() {
               <span>AI Personalized Readiness Track</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
-              Welcome back, <span className="gradient-text">{user?.name}</span>!
+              Welcome back, <span className="gradient-text">{user?.name || 'Learner'}</span>!
             </h1>
             <p className="text-xs md:text-sm text-slate-400 max-w-xl">
-              Your AI Coach analyzed your recent practice runs. You are on track for your target companies: <span className="text-blue-300 font-semibold">{user?.targetCompanies?.join(', ') || 'Google, Amazon, TCS'}</span>.
+              {data?.profile?.targetCompanies && data.profile.targetCompanies.length > 0 ? (
+                <>Your AI Coach analyzed your recent practice runs. You are on track for your target companies: <span className="text-blue-300 font-semibold">{data.profile.targetCompanies.join(', ')}</span>.</>
+              ) : (
+                <>Your AI Coach monitors your learning trajectory. Complete practice sessions to boost placement readiness.</>
+              )}
             </p>
           </div>
 

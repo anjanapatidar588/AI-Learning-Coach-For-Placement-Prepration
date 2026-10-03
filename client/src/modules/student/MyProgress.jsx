@@ -74,29 +74,29 @@ const MyProgress = () => {
     );
   }
 
-  // Real backend metrics or structured defaults matching reference design
-  const overall = progressData?.overall || { totalAttempts: 142, passedAttempts: 78, failedAttempts: 64, accuracy: 60, totalTimeSpentSeconds: 66600, hintsUsed: 12 };
-  const dsa = progressData?.dsa || { totalAttempts: 50, passedAttempts: 32.5, accuracy: 65 };
-  const aptitude = progressData?.aptitude || { totalAttempts: 40, passedAttempts: 28.8, accuracy: 72 };
-  const csCore = progressData?.csCore || { totalAttempts: 30, passedAttempts: 16.5, accuracy: 55 };
+  // Real backend metrics or zero-state fallback
+  const overall = progressData?.overall || { totalAttempts: 0, passedAttempts: 0, failedAttempts: 0, accuracy: 0, totalTimeSpentSeconds: 0, hintsUsed: 0 };
+  const dsa = progressData?.dsa || { totalAttempts: 0, passedAttempts: 0, accuracy: 0 };
+  const aptitude = progressData?.aptitude || { totalAttempts: 0, passedAttempts: 0, accuracy: 0 };
+  const csCore = progressData?.csCore || { totalAttempts: 0, passedAttempts: 0, accuracy: 0 };
 
-  const totalQuestions = overall.totalAttempts > 0 ? overall.totalAttempts : 142;
-  const solvedQuestions = overall.passedAttempts > 0 ? overall.passedAttempts : 78;
-  const attemptedQuestions = overall.failedAttempts > 0 ? overall.failedAttempts : 64;
-  const overallAccuracy = overall.accuracy > 0 ? overall.accuracy : 60;
-  const studyHoursVal = overall.totalTimeSpentSeconds > 0 ? (overall.totalTimeSpentSeconds / 3600).toFixed(1) : '18.5';
+  const totalQuestions = overall.totalAttempts || 0;
+  const solvedQuestions = overall.passedAttempts || 0;
+  const attemptedQuestions = overall.failedAttempts || 0;
+  const overallAccuracy = overall.accuracy || 0;
+  const studyHoursVal = overall.totalTimeSpentSeconds > 0 ? (overall.totalTimeSpentSeconds / 3600).toFixed(1) : '0.0';
   const studyTargetHours = 40;
-  const studyProgressPct = Math.min(100, Math.round((Number(studyHoursVal) / studyTargetHours) * 100)) || 48;
-  const currentStreakDays = progressData?.streak?.current || 5;
+  const studyProgressPct = Math.min(100, Math.round((Number(studyHoursVal) / studyTargetHours) * 100)) || 0;
+  const currentStreakDays = progressData?.streak?.current || 0;
 
   // 6 Subjects for Bar Chart & Subject Progress Ring
   const subjectsPerformance = [
-    { name: 'DSA', score: dsa.accuracy || 65, color: '#818cf8', barBg: 'bg-indigo-500', icon: Code2 },
-    { name: 'Aptitude', score: aptitude.accuracy || 72, color: '#34d399', barBg: 'bg-emerald-400', icon: BrainCircuit },
-    { name: 'DBMS', score: 58, color: '#60a5fa', barBg: 'bg-blue-400', icon: Database },
-    { name: 'OOPS', score: 61, color: '#f472b6', barBg: 'bg-pink-400', icon: Layers },
-    { name: 'OS', score: 48, color: '#fb923c', barBg: 'bg-orange-400', icon: Cpu },
-    { name: 'CN', score: 55, color: '#2dd4bf', barBg: 'bg-teal-400', icon: Network },
+    { name: 'DSA', score: dsa.accuracy || 0, color: '#818cf8', barBg: 'bg-indigo-500', icon: Code2 },
+    { name: 'Aptitude', score: aptitude.accuracy || 0, color: '#34d399', barBg: 'bg-emerald-400', icon: BrainCircuit },
+    { name: 'DBMS', score: progressData?.dbms?.accuracy || 0, color: '#60a5fa', barBg: 'bg-blue-400', icon: Database },
+    { name: 'OOPS', score: progressData?.oops?.accuracy || 0, color: '#f472b6', barBg: 'bg-pink-400', icon: Layers },
+    { name: 'OS', score: progressData?.os?.accuracy || 0, color: '#fb923c', barBg: 'bg-orange-400', icon: Cpu },
+    { name: 'CN', score: progressData?.cn?.accuracy || 0, color: '#2dd4bf', barBg: 'bg-teal-400', icon: Network },
   ];
 
   // Donut Ring Math
@@ -105,20 +105,25 @@ const MyProgress = () => {
   const donutOffset = donutCircumference - (overallAccuracy / 100) * donutCircumference;
 
   // Recent Activity Items
-  const recentActivities = [
-    { title: 'DSA - Arrays & Two Pointers', pill: 'Completed', pillStyle: 'bg-emerald-50 text-emerald-700 border-emerald-200', time: '2 hours ago', iconBg: 'bg-emerald-100 text-emerald-600' },
-    { title: 'Aptitude - Percentages', pill: 'Practice', pillStyle: 'bg-blue-50 text-blue-700 border-blue-200', time: '4 hours ago', iconBg: 'bg-cyan-100 text-cyan-600' },
-    { title: 'DBMS - Introduction to DBMS', pill: 'Viewed', pillStyle: 'bg-slate-100 text-slate-700 border-slate-200', time: '1 day ago', iconBg: 'bg-blue-100 text-blue-600' },
-    { title: 'Mock Test - Full Test', pill: 'Attempted', pillStyle: 'bg-emerald-50 text-emerald-700 border-emerald-200', time: '1 day ago', iconBg: 'bg-orange-100 text-orange-600' }
-  ];
+  const recentActivities = Array.isArray(progressData?.recentActivity) && progressData.recentActivity.length > 0
+    ? progressData.recentActivity.map(act => ({
+        title: `${act.category?.toUpperCase() || 'Practice'} - ${act.questionId?.title || 'Problem'}`,
+        pill: act.status || 'Attempted',
+        pillStyle: act.status === 'Accepted' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-blue-50 text-blue-700 border-blue-200',
+        time: act.createdAt ? new Date(act.createdAt).toLocaleDateString() : 'Recently',
+        iconBg: act.status === 'Accepted' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'
+      }))
+    : [];
 
   // Quick Insights AI items
-  const quickInsights = [
-    { title: 'Focus on OS', desc: 'Your score is 48%. Consider more practice.', iconBg: 'bg-orange-100 text-orange-600', icon: Cpu },
-    { title: 'Revise Arrays', desc: 'High accuracy but low confidence.', iconBg: 'bg-blue-100 text-blue-600', icon: Code2 },
-    { title: 'Take a Mock Test', desc: 'Improve time management skills.', iconBg: 'bg-purple-100 text-purple-600', icon: FileText },
-    { title: 'Complete Learning Map', desc: '8 topics are still pending.', iconBg: 'bg-pink-100 text-pink-600', icon: Sparkles }
-  ];
+  const quickInsights = Array.isArray(progressData?.weakTopics) && progressData.weakTopics.length > 0
+    ? progressData.weakTopics.slice(0, 4).map(wt => ({
+        title: `Focus on ${wt.topicName || wt.topic || 'Weak Topic'}`,
+        desc: `Your accuracy is ${wt.accuracy || 0}%. Consider more practice.`,
+        iconBg: 'bg-orange-100 text-orange-600',
+        icon: Cpu
+      }))
+    : [];
 
   return (
     <div className="space-y-6 max-w-[1600px] mx-auto pb-12 font-sans selection:bg-indigo-500/20 selection:text-indigo-900">
@@ -552,23 +557,29 @@ const MyProgress = () => {
           </div>
 
           <div className="space-y-2.5 flex-1">
-            {recentActivities.map((act, aIdx) => (
-              <div key={aIdx} className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center justify-between text-xs">
-                <div className="flex items-center space-x-3 truncate">
-                  <div className={`w-7 h-7 rounded-xl ${act.iconBg} flex items-center justify-center shrink-0`}>
-                    <Code2 className="w-3.5 h-3.5" />
+            {recentActivities.length > 0 ? (
+              recentActivities.map((act, aIdx) => (
+                <div key={aIdx} className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center justify-between text-xs">
+                  <div className="flex items-center space-x-3 truncate">
+                    <div className={`w-7 h-7 rounded-xl ${act.iconBg} flex items-center justify-center shrink-0`}>
+                      <Code2 className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="truncate">
+                      <h4 className="font-bold text-slate-900 truncate">{act.title}</h4>
+                      <span className="text-[10px] text-slate-400 font-medium">{act.time}</span>
+                    </div>
                   </div>
-                  <div className="truncate">
-                    <h4 className="font-bold text-slate-900 truncate">{act.title}</h4>
-                    <span className="text-[10px] text-slate-400 font-medium">{act.time}</span>
-                  </div>
-                </div>
 
-                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${act.pillStyle}`}>
-                  {act.pill}
-                </span>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${act.pillStyle}`}>
+                    {act.pill}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div className="text-[11px] text-slate-500 py-4 text-center italic">
+                No recent activity recorded yet. Start practicing to see your attempts!
               </div>
-            ))}
+            )}
           </div>
         </div>
 
@@ -585,28 +596,34 @@ const MyProgress = () => {
           </div>
 
           <div className="space-y-2.5 flex-1">
-            {quickInsights.map((ins, iIdx) => {
-              const Icon = ins.icon;
-              return (
-                <div
-                  key={iIdx}
-                  onClick={() => navigate('/student/ai-coach')}
-                  className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center justify-between hover:bg-indigo-50/50 hover:border-indigo-200 transition-all cursor-pointer group"
-                >
-                  <div className="flex items-center space-x-3 truncate">
-                    <div className={`w-7 h-7 rounded-xl ${ins.iconBg} flex items-center justify-center shrink-0`}>
-                      <Icon className="w-3.5 h-3.5" />
+            {quickInsights.length > 0 ? (
+              quickInsights.map((ins, iIdx) => {
+                const Icon = ins.icon;
+                return (
+                  <div
+                    key={iIdx}
+                    onClick={() => navigate('/student/ai-coach')}
+                    className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center justify-between hover:bg-indigo-50/50 hover:border-indigo-200 transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center space-x-3 truncate">
+                      <div className={`w-7 h-7 rounded-xl ${ins.iconBg} flex items-center justify-center shrink-0`}>
+                        <Icon className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="truncate">
+                        <h4 className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">{ins.title}</h4>
+                        <p className="text-[10px] text-slate-500 truncate">{ins.desc}</p>
+                      </div>
                     </div>
-                    <div className="truncate">
-                      <h4 className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">{ins.title}</h4>
-                      <p className="text-[10px] text-slate-500 truncate">{ins.desc}</p>
-                    </div>
-                  </div>
 
-                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 transition-colors shrink-0" />
-                </div>
-              );
-            })}
+                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 transition-colors shrink-0" />
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-[11px] text-slate-500 py-4 text-center italic">
+                No quick insights yet. Keep completing topics to unlock AI recommendations!
+              </div>
+            )}
           </div>
         </div>
 

@@ -4,8 +4,8 @@ const topicDistributionSchema = new mongoose.Schema({
   topicId: { type: mongoose.Schema.Types.ObjectId, ref: 'Topic' },
   topicName: { type: String, required: true },
   category: { type: String, enum: ['dsa', 'aptitude', 'cs_core', 'oops', 'dbms', 'os', 'cn'], default: 'dsa' },
-  questionCount: { type: Number, required: true, min: 1 },
-  difficulty: { type: String, enum: ['Easy', 'Medium', 'Hard'], default: 'Medium' },
+  questionCount: { type: Number, default: 1, min: 0 },
+  difficulty: { type: String, enum: ['Easy', 'Medium', 'Hard', 'Mixed'], default: 'Medium' },
 }, { _id: false });
 
 const assessmentBlueprintSchema = new mongoose.Schema({
@@ -16,7 +16,9 @@ const assessmentBlueprintSchema = new mongoose.Schema({
     enum: ['dsa', 'aptitude', 'cs_core', 'oops', 'dbms', 'os', 'cn'],
     required: true
   }],
+  selectedTopics: [{ type: String }],
   topicDistribution: [topicDistributionSchema],
+  difficulty: { type: String, enum: ['Easy', 'Medium', 'Hard', 'Mixed'], default: 'Medium' },
   difficultyDistribution: {
     easy: { type: Number, default: 0 },
     medium: { type: Number, default: 0 },
@@ -40,6 +42,11 @@ const assessmentBlueprintSchema = new mongoose.Schema({
     enum: ['DRAFT', 'GENERATING', 'REVIEW', 'APPROVED', 'PUBLISHED', 'ARCHIVED'],
     default: 'DRAFT'
   },
+  assessmentPurpose: {
+    type: String,
+    enum: ['INITIAL_BASELINE', 'PRACTICE'],
+    default: 'PRACTICE'
+  },
   version: { type: Number, default: 1 },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -53,3 +60,4 @@ const assessmentBlueprintSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 export default mongoose.model('AssessmentBlueprint', assessmentBlueprintSchema);
+

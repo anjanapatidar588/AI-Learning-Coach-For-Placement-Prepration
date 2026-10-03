@@ -90,8 +90,11 @@ export const createAdminAssessmentBlueprint = async (req, res) => {
       negativeMarking,
       negativeMarks,
       targetAudience,
-      graduationYear
+      graduationYear,
+      assessmentPurpose
     } = req.body;
+
+    const cleanPurpose = ['INITIAL_BASELINE', 'PRACTICE'].includes(assessmentPurpose) ? assessmentPurpose : 'PRACTICE';
 
     if (!title || typeof title !== 'string' || !title.trim()) {
       return res.status(400).json({ success: false, message: 'Blueprint title is required' });
@@ -113,11 +116,15 @@ export const createAdminAssessmentBlueprint = async (req, res) => {
     }
 
     const allowedSubjects = ['dsa', 'aptitude', 'cs_core', 'oops', 'dbms', 'os', 'cn'];
+    const { selectedTopics, difficulty } = req.body;
+
     let validSubjects = Array.isArray(subjects) && subjects.length > 0
       ? subjects.filter(s => allowedSubjects.includes(s))
       : [];
 
-    // Clean and validate topic distribution
+    let cleanSelectedTopics = Array.isArray(selectedTopics) ? selectedTopics.map(st => String(st).trim()).filter(Boolean) : [];
+
+    // Clean topic distribution if supplied or derive from selected topics
     let cleanTopicDist = [];
     if (Array.isArray(topicDistribution) && topicDistribution.length > 0) {
       cleanTopicDist = topicDistribution.map(t => {
@@ -126,20 +133,23 @@ export const createAdminAssessmentBlueprint = async (req, res) => {
           validSubjects.push(cat);
         }
         return {
-          topicName: (t.topicName || 'General Topic').trim(),
+          topicName: (t.topicName || t.name || 'General Topic').trim(),
           category: cat,
           questionCount: Number(t.questionCount) || 1,
-          difficulty: ['Easy', 'Medium', 'Hard'].includes(t.difficulty) ? t.difficulty : 'Medium'
+          difficulty: ['Easy', 'Medium', 'Hard', 'Mixed'].includes(t.difficulty) ? t.difficulty : (difficulty || 'Medium')
         };
       });
+    } else if (cleanSelectedTopics.length > 0) {
+      cleanTopicDist = cleanSelectedTopics.map(tName => ({
+        topicName: tName,
+        category: validSubjects[0] || 'dsa',
+        questionCount: 1,
+        difficulty: ['Easy', 'Medium', 'Hard', 'Mixed'].includes(difficulty) ? difficulty : 'Medium'
+      }));
+    }
 
-      const sumCount = cleanTopicDist.reduce((acc, t) => acc + (Number(t.questionCount) || 0), 0);
-      if (sumCount !== qCount) {
-        return res.status(400).json({
-          success: false,
-          message: `Question distribution (${sumCount}) must equal blueprint question count (${qCount})`
-        });
-      }
+    if (validSubjects.length === 0 && cleanSelectedTopics.length === 0) {
+      return res.status(400).json({ success: false, message: 'At least one subject or topic must be selected.' });
     }
 
     if (validSubjects.length === 0) {
@@ -148,24 +158,24 @@ export const createAdminAssessmentBlueprint = async (req, res) => {
 
     const computedTotalMarks = Number(totalMarks) || (qCount * marks);
 
-    // Compute difficulty distribution if not supplied
+    // Compute difficulty distribution
     let cleanDifficulty = difficultyDistribution;
     if (!cleanDifficulty || typeof cleanDifficulty !== 'object') {
-      let easy = 0, medium = 0, hard = 0;
-      cleanTopicDist.forEach(t => {
-        const count = Number(t.questionCount) || 0;
-        if (t.difficulty === 'Easy') easy += count;
-        else if (t.difficulty === 'Hard') hard += count;
-        else medium += count;
-      });
-      cleanDifficulty = { easy, medium, hard };
+      const overallDiff = ['Easy', 'Medium', 'Hard'].includes(difficulty) ? difficulty : 'Medium';
+      cleanDifficulty = {
+        easy: overallDiff === 'Easy' ? qCount : 0,
+        medium: overallDiff === 'Medium' ? qCount : 0,
+        hard: overallDiff === 'Hard' ? qCount : 0
+      };
     }
 
     const blueprint = await AssessmentBlueprint.create({
       title: title.trim(),
       description: (description || '').trim(),
       subjects: validSubjects,
+      selectedTopics: cleanSelectedTopics,
       topicDistribution: cleanTopicDist,
+      difficulty: ['Easy', 'Medium', 'Hard', 'Mixed'].includes(difficulty) ? difficulty : 'Medium',
       difficultyDistribution: cleanDifficulty,
       questionCount: qCount,
       questionTypes: Array.isArray(questionTypes) && questionTypes.length > 0 ? questionTypes : ['mcq'],
@@ -176,6 +186,7 @@ export const createAdminAssessmentBlueprint = async (req, res) => {
       negativeMarks: negativeMarking ? (Number(negativeMarks) || 0) : 0,
       targetAudience: (targetAudience || 'All Students').trim(),
       graduationYear: graduationYear ? Number(graduationYear) : undefined,
+      assessmentPurpose: cleanPurpose,
       createdBy: userId,
       status: 'DRAFT'
     });
@@ -240,15 +251,14 @@ export const updateAdminAssessmentBlueprint = async (req, res) => {
     blueprint.questionCount = newQCount;
 
     const newTopics = topicDistribution !== undefined ? topicDistribution : blueprint.topicDistribution;
-    if (Array.isArray(newTopics) && newTopics.length > 0) {
-      const sumCount = newTopics.reduce((acc, t) => acc + (Number(t.questionCount) || 0), 0);
-      if (sumCount !== newQCount) {
-        return res.status(400).json({
-          success: false,
-          message: `Topic question count sum (${sumCount}) must equal blueprint question count (${newQCount})`
-        });
-      }
+    if (Array.isArray(newTopics)) {
       blueprint.topicDistribution = newTopics;
+    }
+    if (req.body.selectedTopics !== undefined && Array.isArray(req.body.selectedTopics)) {
+      blueprint.selectedTopics = req.body.selectedTopics;
+    }
+    if (req.body.difficulty !== undefined) {
+      blueprint.difficulty = req.body.difficulty;
     }
 
     if (difficultyDistribution) blueprint.difficultyDistribution = difficultyDistribution;
@@ -261,6 +271,9 @@ export const updateAdminAssessmentBlueprint = async (req, res) => {
     if (negativeMarks !== undefined) blueprint.negativeMarks = Number(negativeMarks);
     if (targetAudience !== undefined) blueprint.targetAudience = String(targetAudience).trim();
     if (graduationYear !== undefined) blueprint.graduationYear = Number(graduationYear);
+    if (req.body.assessmentPurpose !== undefined && ['INITIAL_BASELINE', 'PRACTICE'].includes(req.body.assessmentPurpose)) {
+      blueprint.assessmentPurpose = req.body.assessmentPurpose;
+    }
 
     await blueprint.save();
     res.json({ success: true, data: blueprint });
@@ -507,10 +520,21 @@ export const publishBlueprint = async (req, res) => {
       order: idx + 1
     }));
 
+    const purpose = blueprint.assessmentPurpose || 'PRACTICE';
+
+    // If publishing a new INITIAL_BASELINE assessment, archive any previous published baseline assessments to maintain single active baseline
+    if (purpose === 'INITIAL_BASELINE') {
+      await PublishedAssessment.updateMany(
+        { assessmentPurpose: 'INITIAL_BASELINE', status: 'PUBLISHED' },
+        { status: 'ARCHIVED' }
+      );
+    }
+
     const publishedAssessment = await PublishedAssessment.create({
       blueprintId: blueprint._id,
       title: blueprint.title,
       description: blueprint.description,
+      assessmentPurpose: purpose,
       version: blueprint.version || 1,
       status: 'PUBLISHED',
       durationMinutes: blueprint.durationMinutes,

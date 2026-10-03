@@ -14,6 +14,11 @@ const publishedAssessmentSchema = new mongoose.Schema({
     enum: ['DRAFT', 'PUBLISHED', 'ARCHIVED'],
     default: 'PUBLISHED'
   },
+  assessmentPurpose: {
+    type: String,
+    enum: ['INITIAL_BASELINE', 'PRACTICE'],
+    default: 'PRACTICE'
+  },
   durationMinutes: { type: Number, required: true, default: 30 },
   totalMarks: { type: Number, required: true },
   marksPerQuestion: { type: Number, default: 1 },

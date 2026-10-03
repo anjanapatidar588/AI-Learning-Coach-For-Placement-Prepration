@@ -42,10 +42,10 @@ const StudentDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState(null);
   const [readinessData, setReadinessData] = useState({
-    score: 68,
-    level: 'Ready',
-    summary: 'Based on your latest assessment and practice activity.',
-    breakdown: { dsa: 72, aptitude: 84, csCore: 58 }
+    score: 0,
+    level: 'Not Evaluated',
+    summary: 'Complete your baseline assessment or practice to calculate your placement readiness.',
+    breakdown: { dsa: 0, aptitude: 0, csCore: 0 }
   });
 
   useEffect(() => {
@@ -60,12 +60,12 @@ const StudentDashboard = () => {
         const d = res.data.data;
         setDashboardData(d);
         const details = d.readinessDetails || {};
-        const score = typeof details.score === 'number' ? details.score : (typeof d.readinessScore === 'number' ? d.readinessScore : 68);
+        const score = typeof details.score === 'number' ? details.score : (typeof d.readinessScore === 'number' ? d.readinessScore : 0);
         setReadinessData({
-          score: score > 0 ? score : 68,
-          level: details.level || (score >= 70 ? 'High' : score >= 50 ? 'Intermediate' : 'Beginner'),
-          summary: details.summary || 'Based on your latest assessment and practice activity.',
-          breakdown: details.breakdown || { dsa: 72, aptitude: 84, csCore: 58 }
+          score: score,
+          level: details.level || (score >= 85 ? 'Placement Ready' : score >= 65 ? 'Good' : score >= 40 ? 'Developing' : 'Not Evaluated'),
+          summary: details.summary || (score > 0 ? 'Based on your latest assessment and practice activity.' : 'Complete your baseline assessment or practice to evaluate readiness.'),
+          breakdown: details.breakdown || { dsa: 0, aptitude: 0, csCore: 0 }
         });
       }
     } catch (err) {
@@ -93,11 +93,11 @@ const StudentDashboard = () => {
 
   const profile = dashboardData?.profile;
   const studentUser = dashboardData?.user || user;
-  const studentName = studentUser?.name || 'Aarav';
-  const firstName = studentName.split(' ')[0] || 'Aarav';
+  const studentName = studentUser?.name || 'Learner';
+  const firstName = studentName.split(' ')[0] || 'Learner';
 
   // Target Date formatting
-  let targetDateDisplay = 'Jun 2026';
+  let targetDateDisplay = 'Not Set';
   if (profile?.targetDate) {
     try {
       const d = new Date(profile.targetDate);
@@ -107,63 +107,53 @@ const StudentDashboard = () => {
     } catch {}
   }
 
-  // Authoritative real assessment metrics or defaults matching current state
+  // Real assessment metrics
   const latestAnalysis = dashboardData?.latestAnalysis;
   const assessmentStatus = dashboardData?.assessmentStatus;
-  const totalScorePct = latestAnalysis?.overallPerformance?.percentage ?? (assessmentStatus?.score || 62);
-  const correctCount = latestAnalysis?.overallPerformance?.correct ?? 18;
-  const totalQuestions = latestAnalysis?.overallPerformance?.totalQuestions ?? 30;
-  const incorrectCount = latestAnalysis?.overallPerformance?.incorrect ?? (totalQuestions - correctCount);
+  const hasAssessment = Boolean(latestAnalysis || assessmentStatus?.completed);
+  const totalScorePct = latestAnalysis?.overallPerformance?.percentage ?? (assessmentStatus?.completed ? assessmentStatus.score : null);
+  const correctCount = latestAnalysis?.overallPerformance?.correct ?? 0;
+  const totalQuestions = latestAnalysis?.overallPerformance?.totalQuestions ?? 0;
+  const incorrectCount = latestAnalysis?.overallPerformance?.incorrect ?? 0;
 
   // Subject performance calculation
   const rawSubj = latestAnalysis?.subjectPerformance || {};
+  const hasSubjectPerf = Object.keys(rawSubj).length > 0;
   const subjects = [
-    { name: 'DSA', score: rawSubj.dsa?.accuracy ?? 72, color: '#14b8a6', border: 'border-teal-500' },
-    { name: 'Aptitude', score: rawSubj.aptitude?.accuracy ?? 84, color: '#3b82f6', border: 'border-blue-500' },
-    { name: 'DBMS', score: rawSubj.dbms?.accuracy ?? 58, color: '#f59e0b', border: 'border-amber-500' },
-    { name: 'OOPS', score: rawSubj.oops?.accuracy ?? 66, color: '#8b5cf6', border: 'border-purple-500' },
-    { name: 'OS', score: rawSubj.os?.accuracy ?? 49, color: '#f43f5e', border: 'border-rose-500' },
-    { name: 'CN', score: rawSubj.cn?.accuracy ?? 61, color: '#06b6d4', border: 'border-cyan-500' },
+    { name: 'DSA', score: rawSubj.dsa?.accuracy ?? 0, color: '#14b8a6', border: 'border-teal-500' },
+    { name: 'Aptitude', score: rawSubj.aptitude?.accuracy ?? 0, color: '#3b82f6', border: 'border-blue-500' },
+    { name: 'DBMS', score: rawSubj.dbms?.accuracy ?? 0, color: '#f59e0b', border: 'border-amber-500' },
+    { name: 'OOPS', score: rawSubj.oops?.accuracy ?? 0, color: '#8b5cf6', border: 'border-purple-500' },
+    { name: 'OS', score: rawSubj.os?.accuracy ?? 0, color: '#f43f5e', border: 'border-rose-500' },
+    { name: 'CN', score: rawSubj.cn?.accuracy ?? 0, color: '#06b6d4', border: 'border-cyan-500' },
   ];
 
-  // Strong topics (using real DB topics if present, otherwise structured list)
+  // Strong topics (using real DB topics if present)
   const strongTopicsList = (latestAnalysis?.strongTopics && latestAnalysis.strongTopics.length > 0)
-    ? latestAnalysis.strongTopics.slice(0, 4).map(st => st.topicName || st)
-    : ['Arrays & Strings', 'Percentages & Ratios', 'OOPS Basics', 'Number Systems'];
+    ? latestAnalysis.strongTopics.slice(0, 4).map(st => typeof st === 'string' ? st : (st.topicName || st.topic || ''))
+    : [];
 
   // Focus areas (using real DB weak topics if present)
   const weakTopicsList = (latestAnalysis?.weakTopics && latestAnalysis.weakTopics.length > 0)
     ? latestAnalysis.weakTopics.slice(0, 3).map((wt, i) => ({
-        topic: wt.topicName || wt,
-        accuracy: wt.accuracy !== undefined ? `${wt.accuracy}%` : (i === 0 ? '45%' : i === 1 ? '52%' : '60%'),
+        topic: typeof wt === 'string' ? wt : (wt.topicName || wt.topic || 'Topic'),
+        accuracy: wt.accuracy !== undefined ? `${wt.accuracy}%` : '0%',
         badge: wt.classification === 'Critical' ? 'Weak' : 'Developing',
         badgeBg: wt.classification === 'Critical' ? 'bg-orange-100 text-orange-700' : 'bg-purple-100 text-purple-700',
-        questions: `${wt.totalQuestions || (i === 0 ? 8 : i === 1 ? 6 : 10)} questions`,
+        questions: `${wt.totalQuestions || 0} questions`,
         icon: i === 0 ? Database : i === 1 ? Cpu : Code2,
         iconBg: i === 0 ? 'bg-orange-100 text-orange-600' : i === 1 ? 'bg-purple-100 text-purple-600' : 'bg-indigo-100 text-indigo-600'
       }))
-    : [
-        { topic: 'DBMS Indexing', accuracy: '45%', badge: 'Weak', badgeBg: 'bg-orange-100 text-orange-700', questions: '8 questions', icon: Database, iconBg: 'bg-orange-100 text-orange-600' },
-        { topic: 'Operating System Scheduling', accuracy: '52%', badge: 'Developing', badgeBg: 'bg-purple-100 text-purple-700', questions: '6 questions', icon: Cpu, iconBg: 'bg-purple-100 text-purple-600' },
-        { topic: 'Binary Search', accuracy: '60%', badge: 'Developing', badgeBg: 'bg-purple-100 text-purple-700', questions: '10 questions', icon: Code2, iconBg: 'bg-indigo-100 text-indigo-600' },
-      ];
+    : [];
 
   // Roadmap flowchart nodes
   const roadmapPreview = dashboardData?.roadmapPreview || [];
-  const roadmapFlowNodes = roadmapPreview.length > 0
-    ? roadmapPreview.slice(0, 5).map((node, i) => ({
-        name: node.title,
-        status: node.status === 'completed' ? 'Completed' : node.status === 'in_progress' ? 'Current' : 'Upcoming',
-        pct: node.status === 'completed' ? '+ 100%' : node.status === 'in_progress' ? '⟳ 60%' : '0%',
-        num: i + 1
-      }))
-    : [
-        { name: 'Arrays', status: 'Completed', pct: '+ 100%', num: 1 },
-        { name: 'Binary Search', status: 'Current', pct: '⟳ 60%', num: 2 },
-        { name: 'Linked List', status: 'Upcoming', pct: '0%', num: 3 },
-        { name: 'Stack & Queue', status: 'Upcoming', pct: '0%', num: 4 },
-        { name: 'Trees', status: 'Upcoming', pct: '0%', num: 5 },
-      ];
+  const roadmapFlowNodes = roadmapPreview.slice(0, 5).map((node, i) => ({
+    name: node.title || node.topicName || `Topic ${i + 1}`,
+    status: node.status === 'completed' ? 'Completed' : ['in_progress', 'current', 'CURRENT'].includes(node.status) ? 'Current' : 'Upcoming',
+    pct: node.status === 'completed' ? '+ 100%' : ['in_progress', 'current', 'CURRENT'].includes(node.status) ? 'In Progress' : '0%',
+    num: i + 1
+  }));
 
   // Recent activity
   const recentActivities = Array.isArray(dashboardData?.recentActivity) && dashboardData.recentActivity.length > 0
@@ -173,17 +163,12 @@ const StudentDashboard = () => {
         color: act.status === 'Accepted' ? 'bg-emerald-500' : 'bg-blue-500',
         iconBg: act.status === 'Accepted' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'
       }))
-    : [
-        { type: 'Assessment completed', detail: 'Aptitude - 28 Sep 2026', iconBg: 'bg-emerald-100 text-emerald-600', isCheck: true },
-        { type: 'Topic completed', detail: 'Arrays - DSA', iconBg: 'bg-blue-100 text-blue-600', isBook: true },
-        { type: 'Mistake reviewed', detail: 'Binary Search - DSA', iconBg: 'bg-rose-100 text-rose-600', isFlag: true },
-        { type: 'Revision completed', detail: 'OOP Concepts - OOPS', iconBg: 'bg-purple-100 text-purple-600', isRefresh: true },
-      ];
+    : [];
 
   // Readiness Gauge SVG Math
   const readinessRadius = 40;
   const readinessCircumference = 2 * Math.PI * readinessRadius;
-  const readinessOffset = readinessCircumference - (readinessData.score / 100) * readinessCircumference;
+  const readinessOffset = readinessCircumference - ((readinessData.score || 0) / 100) * readinessCircumference;
 
   return (
     <div className="space-y-6 max-w-[1500px] mx-auto pb-12">
@@ -307,7 +292,7 @@ const StudentDashboard = () => {
               <div className="truncate">
                 <span className="text-[10px] text-slate-400 font-semibold uppercase block">Target Role</span>
                 <span className="text-xs font-bold text-slate-800 truncate block">
-                  {profile?.targetRoles?.[0] || 'Software Developer'}
+                  {profile?.targetRoles?.[0] || 'Not Specified'}
                 </span>
               </div>
             </div>
@@ -320,7 +305,7 @@ const StudentDashboard = () => {
               <div className="truncate">
                 <span className="text-[10px] text-slate-400 font-semibold uppercase block">College</span>
                 <span className="text-xs font-bold text-slate-800 truncate block">
-                  {profile?.college || 'IIT Bombay'}
+                  {profile?.college || 'Not Specified'}
                 </span>
               </div>
             </div>
@@ -333,7 +318,7 @@ const StudentDashboard = () => {
               <div className="truncate">
                 <span className="text-[10px] text-slate-400 font-semibold uppercase block">Graduation Year</span>
                 <span className="text-xs font-bold text-slate-800 truncate block">
-                  {profile?.graduationYear || '2026'}
+                  {profile?.graduationYear || 'Not Specified'}
                 </span>
               </div>
             </div>
@@ -416,7 +401,7 @@ const StudentDashboard = () => {
 
           <div>
             <div className="flex items-baseline space-x-1.5">
-              <span className="text-2xl font-black text-slate-900">{totalScorePct}%</span>
+              <span className="text-2xl font-black text-slate-900">{totalScorePct !== null ? `${totalScorePct}%` : 'N/A'}</span>
               <span className="text-[11px] text-slate-400 font-semibold">Overall Score</span>
             </div>
           </div>
@@ -456,7 +441,7 @@ const StudentDashboard = () => {
 
           <div>
             <div className="flex items-baseline space-x-1.5">
-              <span className="text-2xl font-black text-slate-900">{dashboardData?.streak || 3}</span>
+              <span className="text-2xl font-black text-slate-900">{dashboardData?.streak ?? 0}</span>
               <span className="text-[11px] text-slate-400 font-semibold">Days</span>
             </div>
           </div>
@@ -578,14 +563,20 @@ const StudentDashboard = () => {
           </div>
 
           <div className="space-y-2 py-1 flex-1">
-            {strongTopicsList.map((topic, tIdx) => (
-              <div key={tIdx} className="flex items-center space-x-2.5 text-xs">
-                <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
-                  <Check className="w-2.5 h-2.5 stroke-[3]" />
+            {strongTopicsList.length > 0 ? (
+              strongTopicsList.map((topic, tIdx) => (
+                <div key={tIdx} className="flex items-center space-x-2.5 text-xs">
+                  <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
+                    <Check className="w-2.5 h-2.5 stroke-[3]" />
+                  </div>
+                  <span className="font-semibold text-slate-700 truncate">{topic}</span>
                 </div>
-                <span className="font-semibold text-slate-700 truncate">{topic}</span>
+              ))
+            ) : (
+              <div className="text-[11px] text-slate-500 py-3 italic">
+                No strong topics evaluated yet. Complete practice sessions to discover your strong areas.
               </div>
-            ))}
+            )}
           </div>
 
           <div className="pt-2 border-t border-slate-100 text-right">
@@ -685,53 +676,58 @@ const StudentDashboard = () => {
 
           {/* Flowchart Sequence with Connected Nodes */}
           <div className="flex items-center justify-between overflow-x-auto py-3 px-1">
-            {roadmapFlowNodes.map((node, nIdx) => {
-              const isCompleted = node.status === 'Completed';
-              const isCurrent = node.status === 'Current';
+            {roadmapFlowNodes.length > 0 ? (
+              roadmapFlowNodes.map((node, nIdx) => {
+                const isCompleted = node.status === 'Completed';
+                const isCurrent = node.status === 'Current';
 
-              return (
-                <React.Fragment key={nIdx}>
-                  <div
-                    className={`flex flex-col items-center justify-center p-3 rounded-2xl border min-w-[90px] text-center space-y-1 transition-all ${
-                      isCompleted
-                        ? 'bg-emerald-50/50 border-emerald-300'
-                        : isCurrent
-                        ? 'bg-indigo-50/70 border-indigo-400 shadow-xs'
-                        : 'bg-white border-slate-200'
-                    }`}
-                  >
-                    {/* Top Status Icon or Number badge */}
+                return (
+                  <React.Fragment key={nIdx}>
                     <div
-                      className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                      className={`flex flex-col items-center justify-center p-3 rounded-2xl border min-w-[90px] text-center space-y-1 transition-all ${
                         isCompleted
-                          ? 'bg-emerald-500 text-white'
+                          ? 'bg-emerald-50/50 border-emerald-300'
                           : isCurrent
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-purple-100 text-purple-700'
+                          ? 'bg-indigo-50/70 border-indigo-400 shadow-xs'
+                          : 'bg-white border-slate-200'
                       }`}
                     >
-                      {isCompleted ? <Check className="w-3 h-3 stroke-[3]" /> : node.num}
+                      <div
+                        className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                          isCompleted
+                            ? 'bg-emerald-500 text-white'
+                            : isCurrent
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-purple-100 text-purple-700'
+                        }`}
+                      >
+                        {isCompleted ? <Check className="w-3 h-3 stroke-[3]" /> : node.num}
+                      </div>
+
+                      <span className="text-xs font-bold text-slate-800 truncate w-full">{node.name}</span>
+                      <span className="text-[10px] text-slate-400 font-medium">{node.status}</span>
+                      <span
+                        className={`text-[10px] font-bold font-mono ${
+                          isCompleted ? 'text-emerald-600' : isCurrent ? 'text-indigo-600' : 'text-slate-400'
+                        }`}
+                      >
+                        {node.pct}
+                      </span>
                     </div>
 
-                    <span className="text-xs font-bold text-slate-800 truncate w-full">{node.name}</span>
-                    <span className="text-[10px] text-slate-400 font-medium">{node.status}</span>
-                    <span
-                      className={`text-[10px] font-bold font-mono ${
-                        isCompleted ? 'text-emerald-600' : isCurrent ? 'text-indigo-600' : 'text-slate-400'
-                      }`}
-                    >
-                      {node.pct}
-                    </span>
-                  </div>
-
-                  {nIdx < roadmapFlowNodes.length - 1 && (
-                    <div className="px-1 text-slate-300">
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </div>
-                  )}
-                </React.Fragment>
-              );
-            })}
+                    {nIdx < roadmapFlowNodes.length - 1 && (
+                      <div className="px-1 text-slate-300">
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </div>
+                    )}
+                  </React.Fragment>
+                );
+              })
+            ) : (
+              <div className="w-full text-center text-xs text-slate-500 py-4 italic">
+                No roadmap generated yet. Take your baseline diagnostic assessment to generate your path!
+              </div>
+            )}
           </div>
         </div>
 
@@ -757,34 +753,40 @@ const StudentDashboard = () => {
           </div>
 
           <div className="space-y-2.5 flex-1">
-            {weakTopicsList.map((item, wIdx) => {
-              const Icon = item.icon;
-              return (
-                <div key={wIdx} className="flex items-center justify-between text-xs">
-                  <div className="flex items-center space-x-2 truncate">
-                    <div className={`w-7 h-7 rounded-lg ${item.iconBg} flex items-center justify-center shrink-0`}>
-                      <Icon className="w-3.5 h-3.5" />
-                    </div>
-                    <div className="truncate">
-                      <span className="font-bold text-slate-800 truncate block">{item.topic}</span>
-                      <div className="flex items-center space-x-1.5 text-[10px]">
-                        <span className="font-bold text-slate-700">{item.accuracy}</span>
-                        <span className={`px-1 rounded font-semibold ${item.badgeBg}`}>{item.badge}</span>
-                        <span className="text-slate-400">{item.questions}</span>
+            {weakTopicsList.length > 0 ? (
+              weakTopicsList.map((item, wIdx) => {
+                const Icon = item.icon;
+                return (
+                  <div key={wIdx} className="flex items-center justify-between text-xs">
+                    <div className="flex items-center space-x-2 truncate">
+                      <div className={`w-7 h-7 rounded-lg ${item.iconBg} flex items-center justify-center shrink-0`}>
+                        <Icon className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="truncate">
+                        <span className="font-bold text-slate-800 truncate block">{item.topic}</span>
+                        <div className="flex items-center space-x-1.5 text-[10px]">
+                          <span className="font-bold text-slate-700">{item.accuracy}</span>
+                          <span className={`px-1 rounded font-semibold ${item.badgeBg}`}>{item.badge}</span>
+                          <span className="text-slate-400">{item.questions}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <Link
-                    to="/student/practice"
-                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 inline-flex items-center space-x-0.5 shrink-0 ml-1"
-                  >
-                    <span>Practice</span>
-                    <ArrowRight className="w-2.5 h-2.5" />
-                  </Link>
-                </div>
-              );
-            })}
+                    <Link
+                      to="/student/practice"
+                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 inline-flex items-center space-x-0.5 shrink-0 ml-1"
+                    >
+                      <span>Practice</span>
+                      <ArrowRight className="w-2.5 h-2.5" />
+                    </Link>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-[11px] text-slate-500 py-3 italic">
+                No focus areas identified yet. Great job!
+              </div>
+            )}
           </div>
         </div>
 
@@ -807,25 +809,31 @@ const StudentDashboard = () => {
           </div>
 
           <div className="space-y-2.5 flex-1">
-            {recentActivities.map((act, rIdx) => (
-              <div key={rIdx} className="flex items-center space-x-2.5 text-xs">
-                <div className={`w-6 h-6 rounded-full ${act.iconBg} flex items-center justify-center shrink-0`}>
-                  {act.isCheck ? (
-                    <Check className="w-3 h-3 stroke-[3]" />
-                  ) : act.isBook ? (
-                    <Code2 className="w-3 h-3" />
-                  ) : act.isFlag ? (
-                    <Flag className="w-3 h-3" />
-                  ) : (
-                    <RotateCcw className="w-3 h-3" />
-                  )}
+            {recentActivities.length > 0 ? (
+              recentActivities.map((act, rIdx) => (
+                <div key={rIdx} className="flex items-center space-x-2.5 text-xs">
+                  <div className={`w-6 h-6 rounded-full ${act.iconBg} flex items-center justify-center shrink-0`}>
+                    {act.isCheck ? (
+                      <Check className="w-3 h-3 stroke-[3]" />
+                    ) : act.isBook ? (
+                      <Code2 className="w-3 h-3" />
+                    ) : act.isFlag ? (
+                      <Flag className="w-3 h-3" />
+                    ) : (
+                      <RotateCcw className="w-3 h-3" />
+                    )}
+                  </div>
+                  <div className="truncate">
+                    <span className="font-bold text-slate-800 block truncate">{act.type}</span>
+                    <span className="text-[10px] text-slate-400 block truncate">{act.detail}</span>
+                  </div>
                 </div>
-                <div className="truncate">
-                  <span className="font-bold text-slate-800 block truncate">{act.type}</span>
-                  <span className="text-[10px] text-slate-400 block truncate">{act.detail}</span>
-                </div>
+              ))
+            ) : (
+              <div className="text-[11px] text-slate-500 py-3 italic">
+                No recent activity recorded yet. Start practicing to see your attempts here.
               </div>
-            ))}
+            )}
           </div>
         </div>
 

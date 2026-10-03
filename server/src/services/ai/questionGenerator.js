@@ -7,7 +7,7 @@ import Topic from '../../models/Topic.js';
  */
 export const validateGeneratedQuestion = (q) => {
   if (!q || typeof q !== 'object') {
-    return { valid: false, error: 'Question is not an object' };
+    return { valid: false, error: 'Question is not a valid object' };
   }
 
   if (!q.title || typeof q.title !== 'string' || q.title.trim().length < 3) {
@@ -69,13 +69,22 @@ export const validateGeneratedQuestion = (q) => {
 
 /**
  * Generates questions using server-side Gemini based on an AssessmentBlueprint.
+ * Strictly validates output and throws clean errors on AI/Gemini failure (no fake questions).
  */
 export const generateQuestionsFromBlueprint = async (blueprint) => {
-  const { title, subjects, topicDistribution, questionCount, difficultyDistribution, questionTypes } = blueprint;
+  const { title, subjects = [], selectedTopics = [], topicDistribution = [], questionCount, difficulty, questionTypes = ['mcq'] } = blueprint;
 
-  const distributionText = Array.isArray(topicDistribution) && topicDistribution.length > 0
-    ? topicDistribution.map(t => `- Topic: "${t.topicName}" (${t.category}), Count: ${t.questionCount}, Difficulty: ${t.difficulty}`).join('\n')
-    : `- Generate ${questionCount} questions across subjects: ${subjects.join(', ')}`;
+  // Build subject/topic context
+  let topicsListText = '';
+  if (selectedTopics && selectedTopics.length > 0) {
+    topicsListText = `Selected Topics: ${selectedTopics.join(', ')}`;
+  } else if (Array.isArray(topicDistribution) && topicDistribution.length > 0) {
+    topicsListText = `Topics & Subjects: ${topicDistribution.map(t => `${t.topicName} (${t.category})`).join(', ')}`;
+  } else if (subjects && subjects.length > 0) {
+    topicsListText = `Subjects: ${subjects.join(', ')}`;
+  } else {
+    topicsListText = 'Subjects: DSA, Aptitude, Computer Science';
+  }
 
   const systemPrompt = `You are an expert computer science and placement assessment author.
 Your task is to generate technical assessment questions adhering strictly to the provided blueprint specifications.
@@ -88,7 +97,7 @@ You MUST return ONLY valid JSON matching this exact structure (no markdown fence
       "title": "Short descriptive title",
       "topicName": "Arrays",
       "category": "dsa",
-      "difficulty": "Easy",
+      "difficulty": "Medium",
       "type": "mcq",
       "problemStatement": "Clear problem statement text...",
       "options": [
@@ -104,25 +113,35 @@ You MUST return ONLY valid JSON matching this exact structure (no markdown fence
 
   const userPrompt = `Generate exactly ${questionCount} questions for the assessment: "${title}".
 
-Question & Topic Blueprint Distribution:
-${distributionText}
-
-Target Question Types: ${questionTypes.join(', ')}
-Allowed Categories: dsa, aptitude, cs_core, oops, dbms, os, cn
+Coverage Specifications:
+- ${topicsListText}
+- Target Difficulty: ${difficulty || 'Medium'}
+- Question Types: ${questionTypes.join(', ')}
+- Allowed Categories: dsa, aptitude, cs_core, oops, dbms, os, cn
 
 REQUIREMENTS:
 1. Each MCQ question MUST have exactly 4 distinct options with exactly one correct option (isCorrect: true).
 2. Category must be mapped to one of: dsa, aptitude, cs_core.
 3. Difficulty must be one of: Easy, Medium, Hard.
-4. Total questions in returned array MUST equal ${questionCount}.`;
+4. Total questions in returned array MUST equal exactly ${questionCount}.
+5. Every question must directly relate to the specified topics/subjects.`;
 
-  const aiRawResponse = await generateAIResponse({
-    persona: 'DSA Mentor',
-    systemPrompt,
-    userPrompt,
-    contextData: { blueprintId: blueprint._id },
-    failIfUnavailable: false
-  });
+  let aiRawResponse = '';
+  try {
+    aiRawResponse = await generateAIResponse({
+      persona: 'DSA Mentor',
+      systemPrompt,
+      userPrompt,
+      contextData: { blueprintId: blueprint._id },
+      failIfUnavailable: true
+    });
+  } catch (err) {
+    throw new Error(`AI question generation service unavailable: ${err.message || 'Please try again.'}`);
+  }
+
+  if (!aiRawResponse || typeof aiRawResponse !== 'string') {
+    throw new Error('AI question generation failed: Empty response from AI model. Please try again.');
+  }
 
   // Extract JSON from potential code fences
   let jsonString = aiRawResponse.trim();
@@ -135,24 +154,17 @@ REQUIREMENTS:
   try {
     parsedData = JSON.parse(jsonString);
   } catch (parseErr) {
-    // If JSON parse fails, attempt clean fallback generation matching blueprint specs
-    parsedData = buildSimulatedQuestions(blueprint);
+    throw new Error('AI question generation failed: Malformed JSON output from AI. Please try again.');
   }
 
   if (!parsedData || !Array.isArray(parsedData.questions)) {
-    parsedData = buildSimulatedQuestions(blueprint);
+    throw new Error('AI question generation failed: Output JSON missing "questions" array. Please try again.');
   }
 
   const rawQuestions = parsedData.questions;
 
-  if (rawQuestions.length !== questionCount) {
-    // Adjust count to match exact blueprint question count
-    if (rawQuestions.length < questionCount) {
-      const simulated = buildSimulatedQuestions(blueprint);
-      rawQuestions.push(...simulated.questions.slice(0, questionCount - rawQuestions.length));
-    } else {
-      rawQuestions.length = questionCount;
-    }
+  if (rawQuestions.length !== Number(questionCount)) {
+    throw new Error(`AI question generation count mismatch: Requested ${questionCount} questions, but AI returned ${rawQuestions.length}. Please try again.`);
   }
 
   // Validate each question strictly
@@ -161,7 +173,7 @@ REQUIREMENTS:
     const q = rawQuestions[i];
     const validation = validateGeneratedQuestion(q);
     if (!validation.valid) {
-      throw new Error(`AI Question validation failed at index ${i}: ${validation.error}`);
+      throw new Error(`AI Question validation failed at index ${i}: ${validation.error}. Please try again.`);
     }
 
     const type = (q.type || 'mcq').toLowerCase();
@@ -175,8 +187,8 @@ REQUIREMENTS:
     validatedQuestions.push({
       title: q.title.trim(),
       topicName: q.topicName || 'General',
-      category: ['aptitude', 'cs_core'].includes((q.category || '').toLowerCase()) ? q.category.toLowerCase() : 'dsa',
-      difficulty: ['Easy', 'Medium', 'Hard'].includes(q.difficulty) ? q.difficulty : 'Medium',
+      category: ['aptitude', 'cs_core', 'oops', 'dbms', 'os', 'cn'].includes((q.category || '').toLowerCase()) ? q.category.toLowerCase() : 'dsa',
+      difficulty: ['Easy', 'Medium', 'Hard'].includes(q.difficulty) ? q.difficulty : (difficulty && ['Easy', 'Medium', 'Hard'].includes(difficulty) ? difficulty : 'Medium'),
       type,
       problemStatement: q.problemStatement.trim(),
       mcqOptions: opts,
@@ -187,61 +199,3 @@ REQUIREMENTS:
   return validatedQuestions;
 };
 
-/**
- * Fallback simulation generator when real AI is offline or returns unparseable text.
- */
-const buildSimulatedQuestions = (blueprint) => {
-  const { topicDistribution, questionCount, subjects } = blueprint;
-  const questions = [];
-
-  const topicsToUse = Array.isArray(topicDistribution) && topicDistribution.length > 0
-    ? topicDistribution
-    : [{ topicName: 'Arrays & Two Pointers', category: 'dsa', questionCount, difficulty: 'Medium' }];
-
-  let qIndex = 1;
-  for (const dist of topicsToUse) {
-    const count = dist.questionCount || 1;
-    for (let i = 0; i < count; i++) {
-      if (questions.length >= questionCount) break;
-
-      questions.push({
-        title: `${dist.topicName} Assessment Question ${i + 1}`,
-        topicName: dist.topicName,
-        category: dist.category || 'dsa',
-        difficulty: dist.difficulty || 'Medium',
-        type: 'mcq',
-        problemStatement: `What is the optimal time complexity to solve ${dist.topicName} pattern problems efficiently?`,
-        options: [
-          { optionId: 'A', text: 'O(N^2) brute force traversal', isCorrect: false },
-          { optionId: 'B', text: 'O(N log N) using sorting', isCorrect: false },
-          { optionId: 'C', text: 'O(N) time with optimal space', isCorrect: true },
-          { optionId: 'D', text: 'O(2^N) exponential branching', isCorrect: false }
-        ],
-        explanation: `Optimal solution uses two pointers or a hash table to achieve O(N) linear time complexity.`
-      });
-      qIndex++;
-    }
-  }
-
-  // Ensure total count matches questionCount
-  while (questions.length < questionCount) {
-    const idx = questions.length + 1;
-    questions.push({
-      title: `Placement Practice Question ${idx}`,
-      topicName: 'Core Technical Concepts',
-      category: 'dsa',
-      difficulty: 'Medium',
-      type: 'mcq',
-      problemStatement: `Which data structure provides O(1) average time complexity for key-value lookups?`,
-      options: [
-        { optionId: 'A', text: 'Binary Search Tree', isCorrect: false },
-        { optionId: 'B', text: 'Hash Table / Map', isCorrect: true },
-        { optionId: 'C', text: 'Linked List', isCorrect: false },
-        { optionId: 'D', text: 'Max Heap', isCorrect: false }
-      ],
-      explanation: 'A Hash Table computes index using a hash function, allowing O(1) average lookup time.'
-    });
-  }
-
-  return { questions: questions.slice(0, questionCount) };
-};

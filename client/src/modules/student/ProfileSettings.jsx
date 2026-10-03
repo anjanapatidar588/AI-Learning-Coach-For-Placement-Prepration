@@ -40,18 +40,18 @@ const ProfileSettings = () => {
   const [copiedEmail, setCopiedEmail] = useState(false);
 
   // Form State
-  const [fullName, setFullName] = useState(user?.name || 'nishkarsh patidar');
-  const [email, setEmail] = useState(user?.email || 'nishkarsh@email.com');
-  const [phone, setPhone] = useState('+91 98765 43210');
+  const [fullName, setFullName] = useState(user?.name || '');
+  const [email, setEmail] = useState(user?.email || '');
+  const [phone, setPhone] = useState('');
   const [avatar, setAvatar] = useState(user?.avatar || '');
 
-  const [college, setCollege] = useState('IIT Bombay / University of Delhi / MIT');
-  const [graduationYear, setGraduationYear] = useState('2027');
-  const [degree, setDegree] = useState('B.Tech (Computer Science)');
+  const [college, setCollege] = useState('');
+  const [graduationYear, setGraduationYear] = useState('');
+  const [degree, setDegree] = useState('');
 
-  const [targetRole, setTargetRole] = useState('Software Engineer / SDE');
-  const [targetCompanies, setTargetCompanies] = useState('FAANG / Top Product Companies');
-  const [targetDate, setTargetDate] = useState('2026-06-30');
+  const [targetRole, setTargetRole] = useState('');
+  const [targetCompanies, setTargetCompanies] = useState('');
+  const [targetDate, setTargetDate] = useState('');
 
   const [dailyTime, setDailyTime] = useState('2-3 hours');
   const [preferredTime, setPreferredTime] = useState('Evening / Night');

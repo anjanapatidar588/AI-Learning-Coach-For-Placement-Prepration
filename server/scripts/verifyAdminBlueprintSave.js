@@ -200,19 +200,16 @@ const runBlueprintSaveVerification = async () => {
     }
     console.log('PASS: Invalid question count rejected with 400:', invalidQCountRes.body.message);
 
-    // 6c. Topic distribution sum mismatch (e.g. topic sum 4 != questionCount 5)
-    const sumMismatchRes = await executeProtectedAdminRoute(createAdminAssessmentBlueprint, adminToken, {
+    // 6c. No subjects or topics selected
+    const noTopicsRes = await executeProtectedAdminRoute(createAdminAssessmentBlueprint, adminToken, {
       ...validPayload,
-      topicDistribution: [
-        { topicName: 'Arrays & Two Pointers', category: 'dsa', questionCount: 2, difficulty: 'Easy' },
-        { topicName: 'Percentages', category: 'aptitude', questionCount: 2, difficulty: 'Easy' }
-        // sum = 4, but questionCount = 5
-      ]
+      subjects: [],
+      selectedTopics: []
     });
-    if (sumMismatchRes.status !== 400) {
-      throw new Error(`Expected 400 for distribution sum mismatch, got ${sumMismatchRes.status}`);
+    if (noTopicsRes.status !== 400) {
+      throw new Error(`Expected 400 for empty subjects/topics, got ${noTopicsRes.status}`);
     }
-    console.log('PASS: Distribution sum mismatch rejected with 400:', sumMismatchRes.body.message);
+    console.log('PASS: Empty subjects/topics selection rejected with 400:', noTopicsRes.body.message);
 
     // 6d. Duration < 5
     const shortDurationRes = await executeProtectedAdminRoute(createAdminAssessmentBlueprint, adminToken, {

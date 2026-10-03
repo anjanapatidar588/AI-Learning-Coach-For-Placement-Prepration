@@ -474,7 +474,7 @@ const AICoach = () => {
         <div className="p-3.5 rounded-xl bg-indigo-50/60 border border-indigo-200 space-y-1">
           <span className="text-[10px] font-mono font-bold text-indigo-700 uppercase">Current Roadmap Target</span>
           <div className="text-xs font-bold text-slate-900">
-            {contextData?.currentRoadmapItem?.topicName || contextData?.currentRoadmapItem?.title || 'Binary Search Trees'}
+            {contextData?.currentRoadmapItem?.topicName || contextData?.currentRoadmapItem?.title || 'Data Structures & Algorithms'}
           </div>
           <p className="text-[11px] text-slate-600 leading-snug">
             {contextData?.currentRoadmapItem?.reason || 'Recommended next practice topic.'}
@@ -485,10 +485,10 @@ const AICoach = () => {
         <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-mono font-bold text-slate-500 uppercase">Placement Readiness</span>
-            <span className="text-xs font-black text-indigo-600 font-mono">{contextData?.readinessScore || 78}%</span>
+            <span className="text-xs font-black text-indigo-600 font-mono">{contextData?.readinessScore || 0}%</span>
           </div>
           <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden mt-1">
-            <div className="bg-indigo-600 h-full rounded-full" style={{ width: `${contextData?.readinessScore || 78}%` }} />
+            <div className="bg-indigo-600 h-full rounded-full" style={{ width: `${contextData?.readinessScore || 0}%` }} />
           </div>
         </div>
 
@@ -502,13 +502,13 @@ const AICoach = () => {
           {contextData?.weakAreas && contextData.weakAreas.length > 0 ? (
             contextData.weakAreas.slice(0, 2).map((wa, i) => (
               <div key={i} className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs">
-                <div className="font-bold text-amber-900">{wa.topicName || wa}</div>
+                <div className="font-bold text-amber-900">{typeof wa === 'string' ? wa : (wa.topicName || wa.topic || 'Topic')}</div>
                 <div className="text-[10px] text-amber-800 font-mono mt-0.5">Priority: {wa.priority || 'High'}</div>
               </div>
             ))
           ) : (
             <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600">
-              <span className="font-semibold text-slate-800">Dynamic Programming</span> (Accuracy drop detected in 0/1 Knapsack).
+              No active knowledge gaps detected yet. Keep practicing!
             </div>
           )}
         </div>

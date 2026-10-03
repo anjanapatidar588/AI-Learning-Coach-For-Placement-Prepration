@@ -48,18 +48,50 @@ const AdminAssessmentManagement = () => {
   const [description, setDescription] = useState('');
   const [targetAudience, setTargetAudience] = useState('All Students');
   const [targetRole, setTargetRole] = useState('Software Development Engineer (SDE-1)');
-  const [subjects, setSubjects] = useState(['dsa', 'aptitude', 'dbms']);
   const [questionCount, setQuestionCount] = useState(5);
   const [durationMinutes, setDurationMinutes] = useState(30);
   const [marksPerQuestion, setMarksPerQuestion] = useState(1);
   const [negativeMarking, setNegativeMarking] = useState(false);
   const [negativeMarks, setNegativeMarks] = useState(0.25);
+  const [selectedDifficulty, setSelectedDifficulty] = useState('Medium');
+  const [assessmentPurpose, setAssessmentPurpose] = useState('PRACTICE');
 
-  const [topicDistribution, setTopicDistribution] = useState([
-    { topicName: 'Arrays & Two Pointers', category: 'dsa', questionCount: 2, difficulty: 'Easy' },
-    { topicName: 'Percentages', category: 'aptitude', questionCount: 2, difficulty: 'Easy' },
-    { topicName: 'SQL Queries', category: 'dbms', questionCount: 1, difficulty: 'Medium' }
+  const AVAILABLE_TOPICS = [
+    { name: 'Arrays & Two Pointers', category: 'dsa', categoryLabel: 'DSA' },
+    { name: 'Strings & Hashing', category: 'dsa', categoryLabel: 'DSA' },
+    { name: 'Stacks, Queues & Linked Lists', category: 'dsa', categoryLabel: 'DSA' },
+    { name: 'Trees & Graph Algorithms', category: 'dsa', categoryLabel: 'DSA' },
+    { name: 'Dynamic Programming', category: 'dsa', categoryLabel: 'DSA' },
+    { name: 'Quantitative Aptitude', category: 'aptitude', categoryLabel: 'Aptitude' },
+    { name: 'Logical Reasoning', category: 'aptitude', categoryLabel: 'Aptitude' },
+    { name: 'Data Interpretation', category: 'aptitude', categoryLabel: 'Aptitude' },
+    { name: 'SQL & DBMS', category: 'dbms', categoryLabel: 'DBMS' },
+    { name: 'OOP Concepts', category: 'oops', categoryLabel: 'OOPS' },
+    { name: 'Operating Systems', category: 'os', categoryLabel: 'OS' },
+    { name: 'Computer Networks', category: 'cn', categoryLabel: 'CN' }
+  ];
+
+  const [selectedTopics, setSelectedTopics] = useState([
+    'Arrays & Two Pointers',
+    'Quantitative Aptitude',
+    'SQL & DBMS'
   ]);
+
+  const toggleTopicSelection = (topicName) => {
+    if (selectedTopics.includes(topicName)) {
+      if (selectedTopics.length <= 1) {
+        setFormErrorMessage('At least one topic must be selected.');
+        return;
+      }
+      setSelectedTopics(selectedTopics.filter(t => t !== topicName));
+    } else {
+      setSelectedTopics([...selectedTopics, topicName]);
+    }
+    if (formErrors.selectedTopics) {
+      setFormErrors({ ...formErrors, selectedTopics: null });
+    }
+    setFormErrorMessage('');
+  };
 
   const fetchBlueprints = async () => {
     try {
@@ -78,31 +110,6 @@ const AdminAssessmentManagement = () => {
   useEffect(() => {
     fetchBlueprints();
   }, []);
-
-  // Topic Distribution Helper Functions
-  const addTopicRow = () => {
-    setTopicDistribution([...topicDistribution, { topicName: '', category: 'dsa', questionCount: 1, difficulty: 'Medium' }]);
-  };
-
-  const removeTopicRow = (index) => {
-    if (topicDistribution.length <= 1) {
-      setFormErrorMessage('At least one topic row is required.');
-      return;
-    }
-    setTopicDistribution(topicDistribution.filter((_, idx) => idx !== index));
-  };
-
-  const updateTopicRow = (index, field, value) => {
-    const updated = [...topicDistribution];
-    updated[index][field] = value;
-    setTopicDistribution(updated);
-    if (formErrors.topicDistribution) {
-      setFormErrors({ ...formErrors, topicDistribution: null });
-    }
-  };
-
-  const topicSum = topicDistribution.reduce((acc, t) => acc + (Number(t.questionCount) || 0), 0);
-  const isDistributionValid = topicSum === Number(questionCount);
 
   // Handle Blueprint Creation
   const handleCreateBlueprint = async (e) => {
@@ -132,20 +139,8 @@ const AdminAssessmentManagement = () => {
       errors.marksPerQuestion = 'Marks per question must be at least 1.';
     }
 
-    if (!topicDistribution || topicDistribution.length === 0) {
-      errors.topicDistribution = 'At least one topic is required.';
-    } else {
-      const hasEmptyTopic = topicDistribution.some(t => !t.topicName || !t.topicName.trim());
-      if (hasEmptyTopic) {
-        errors.topicDistribution = 'All topics must have a valid topic name.';
-      }
-      const hasInvalidCount = topicDistribution.some(t => !t.questionCount || Number(t.questionCount) < 1);
-      if (hasInvalidCount) {
-        errors.topicDistribution = 'Each topic must have at least 1 question assigned.';
-      }
-      if (topicSum !== qCount) {
-        errors.topicDistribution = `Question distribution total (${topicSum}) must equal total question count (${qCount}).`;
-      }
+    if (!selectedTopics || selectedTopics.length === 0) {
+      errors.selectedTopics = 'At least one topic or subject must be selected.';
     }
 
     if (Object.keys(errors).length > 0) {
@@ -157,26 +152,38 @@ const AdminAssessmentManagement = () => {
     try {
       setActionLoading(true);
 
-      const validCategories = Array.from(new Set(topicDistribution.map(t => t.category).filter(Boolean)));
-      const finalSubjects = validCategories.length > 0 ? validCategories : (subjects.length > 0 ? subjects : ['dsa']);
+      const matchedCategories = Array.from(
+        new Set(
+          selectedTopics
+            .map(tName => AVAILABLE_TOPICS.find(at => at.name === tName)?.category)
+            .filter(Boolean)
+        )
+      );
+      const finalSubjects = matchedCategories.length > 0 ? matchedCategories : ['dsa'];
 
       const payload = {
         title: title.trim(),
         description: (description || '').trim(),
         targetAudience: (targetAudience || 'All Students').trim(),
+        assessmentPurpose,
         subjects: finalSubjects,
+        selectedTopics,
+        difficulty: selectedDifficulty,
         questionCount: qCount,
         durationMinutes: dur,
         marksPerQuestion: marks,
         totalMarks: qCount * marks,
         negativeMarking: Boolean(negativeMarking),
         negativeMarks: negativeMarking ? (Number(negativeMarks) || 0) : 0,
-        topicDistribution: topicDistribution.map(t => ({
-          topicName: t.topicName.trim(),
-          category: t.category,
-          questionCount: Number(t.questionCount) || 1,
-          difficulty: t.difficulty || 'Medium'
-        }))
+        topicDistribution: selectedTopics.map(tName => {
+          const match = AVAILABLE_TOPICS.find(at => at.name === tName);
+          return {
+            topicName: tName,
+            category: match?.category || 'dsa',
+            questionCount: 1,
+            difficulty: selectedDifficulty
+          };
+        })
       };
 
       const res = await API.post('/admin/assessment-blueprints', payload);
@@ -430,6 +437,7 @@ const AdminAssessmentManagement = () => {
             <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200">
               <tr>
                 <th className="py-3.5 px-4">Blueprint Title</th>
+                <th className="py-3.5 px-4">Purpose</th>
                 <th className="py-3.5 px-4">Questions / Duration</th>
                 <th className="py-3.5 px-4">Subjects Covered</th>
                 <th className="py-3.5 px-4">Status</th>
@@ -442,6 +450,17 @@ const AdminAssessmentManagement = () => {
                   <td className="py-3.5 px-4">
                     <div className="font-bold text-slate-900">{bp.title}</div>
                     <div className="text-[11px] text-slate-500 truncate max-w-xs">{bp.description || 'No description'}</div>
+                  </td>
+                  <td className="py-3.5 px-4">
+                    {bp.assessmentPurpose === 'INITIAL_BASELINE' ? (
+                      <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-[10px] font-bold font-mono border border-purple-200">
+                        INITIAL BASELINE
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold font-mono border border-slate-200">
+                        PRACTICE
+                      </span>
+                    )}
                   </td>
                   <td className="py-3.5 px-4">
                     <div className="font-semibold text-slate-900">{bp.questionCount} Questions ({bp.totalMarks} Marks)</div>
@@ -551,6 +570,53 @@ const AdminAssessmentManagement = () => {
                 />
               </div>
 
+              {/* Assessment Purpose Selector */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Assessment Purpose</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setAssessmentPurpose('PRACTICE')}
+                    className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                      assessmentPurpose === 'PRACTICE'
+                        ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-1 ring-indigo-300 shadow-xs'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="font-bold text-xs">Practice Assessment</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">Regular or topic-specific practice evaluation</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAssessmentPurpose('INITIAL_BASELINE')}
+                    className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                      assessmentPurpose === 'INITIAL_BASELINE'
+                        ? 'bg-purple-50 border-purple-500 text-purple-900 ring-1 ring-purple-300 shadow-xs'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="font-bold text-xs flex items-center justify-between">
+                      <span>Initial Baseline Assessment</span>
+                      <span className="px-1.5 py-0.2 rounded bg-purple-200 text-purple-800 text-[9px] uppercase font-mono font-extrabold">Baseline</span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">Placement diagnostic test for new students</div>
+                  </button>
+                </div>
+
+                {assessmentPurpose === 'INITIAL_BASELINE' && (
+                  <div className="mt-2 p-3 rounded-xl bg-purple-50/80 border border-purple-200 text-purple-900 text-xs flex items-start gap-2">
+                    <Sparkles className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold">Initial Baseline Assessment:</span>
+                      <p className="text-[11px] text-purple-800 leading-snug mt-0.5">
+                        This assessment is used to evaluate a new student's current preparation level and generate their personalized roadmap.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Numerical Metrics */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
@@ -633,86 +699,87 @@ const AdminAssessmentManagement = () => {
                 </div>
               </div>
 
-              {/* Topic Question Distribution Builder */}
-              <div className="space-y-2 pt-2">
+              {/* Difficulty Selection */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Target Difficulty</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {['Mixed', 'Easy', 'Medium', 'Hard'].map((diff) => (
+                    <button
+                      key={diff}
+                      type="button"
+                      onClick={() => setSelectedDifficulty(diff)}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                        selectedDifficulty === diff
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-indigo-300'
+                      }`}
+                    >
+                      {diff}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Subjects & Topics Selection UX */}
+              <div className="space-y-2.5 pt-1">
                 <div className="flex items-center justify-between">
-                  <label className="font-bold text-slate-700">
-                    Topic Question Distribution (Sum: <span className={isDistributionValid ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold'}>{topicSum}</span> / {questionCount})
-                  </label>
-                  <button
-                    type="button"
-                    onClick={addTopicRow}
-                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer flex items-center gap-1"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Topic Row</span>
-                  </button>
+                  <div>
+                    <label className="font-bold text-slate-900 block">Subjects & Topics</label>
+                    <span className="text-[11px] text-slate-500 font-medium">Select the topics you want AI to cover in this assessment</span>
+                  </div>
                 </div>
 
-                {formErrors.topicDistribution && (
+                {formErrors.selectedTopics && (
                   <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-[11px] flex items-center gap-1.5 font-semibold">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-600" />
-                    <span>{formErrors.topicDistribution}</span>
+                    <span>{formErrors.selectedTopics}</span>
                   </div>
                 )}
 
-                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                  {topicDistribution.map((t, idx) => (
-                    <div key={idx} className="flex items-center space-x-2">
-                      <input
-                        type="text"
-                        value={t.topicName}
-                        onChange={(e) => updateTopicRow(idx, 'topicName', e.target.value)}
-                        placeholder="Topic Name (e.g. Arrays)"
-                        className="flex-1 input-standard py-1.5 text-xs"
-                      />
-                      <select
-                        value={t.category}
-                        onChange={(e) => updateTopicRow(idx, 'category', e.target.value)}
-                        className="select-standard py-1.5 text-xs w-28 shrink-0"
-                      >
-                        <option value="dsa">DSA</option>
-                        <option value="aptitude">Aptitude</option>
-                        <option value="dbms">DBMS</option>
-                        <option value="oops">OOPS</option>
-                        <option value="os">OS</option>
-                        <option value="cn">CN</option>
-                      </select>
-                      <input
-                        type="number"
-                        min={1}
-                        value={t.questionCount}
-                        onChange={(e) => updateTopicRow(idx, 'questionCount', Number(e.target.value))}
-                        className="w-16 input-standard py-1.5 text-xs text-center shrink-0"
-                      />
+                {/* Topic Selection Chips Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-52 overflow-y-auto pr-1 pt-1">
+                  {AVAILABLE_TOPICS.map((top) => {
+                    const isSelected = selectedTopics.includes(top.name);
+                    return (
                       <button
+                        key={top.name}
                         type="button"
-                        onClick={() => removeTopicRow(idx)}
-                        className="text-slate-400 hover:text-rose-600 p-1 cursor-pointer transition-colors"
-                        title="Remove Topic"
+                        onClick={() => toggleTopicSelection(top.name)}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between space-y-1 ${
+                          isSelected
+                            ? 'bg-indigo-50/80 border-indigo-500 text-indigo-900 shadow-xs'
+                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'
+                        }`}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold uppercase tracking-wider font-mono text-indigo-600">
+                            {top.categoryLabel}
+                          </span>
+                          {isSelected && <CheckCircle2 className="w-4 h-4 text-indigo-600" />}
+                        </div>
+                        <span className="text-xs font-bold leading-snug">{top.name}</span>
                       </button>
-                    </div>
-                  ))}
+                    );
+                  })}
+                </div>
+
+                {/* Summary Pill */}
+                <div className="p-3 rounded-xl bg-slate-100 border border-slate-200/80 text-slate-700 text-xs font-semibold flex items-center space-x-2">
+                  <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>
+                    <strong>{questionCount} questions</strong> will be generated across <strong>{selectedTopics.length} selected topics</strong>.
+                  </span>
                 </div>
               </div>
             </form>
 
-            {/* Fixed Footer with prominent, clickable Save Blueprint button */}
+            {/* Fixed Footer */}
             <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
               <div className="text-xs">
-                {!isDistributionValid ? (
-                  <span className="text-amber-600 font-semibold flex items-center gap-1.5 text-[11px]">
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                    <span>Distribution sum: {topicSum} / {questionCount}</span>
-                  </span>
-                ) : (
-                  <span className="text-emerald-600 font-semibold flex items-center gap-1.5 text-[11px]">
-                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                    <span>Distribution balanced ({topicSum}/{questionCount})</span>
-                  </span>
-                )}
+                <span className="text-emerald-600 font-semibold flex items-center gap-1.5 text-[11px]">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>{selectedTopics.length} topics selected</span>
+                </span>
               </div>
 
               <div className="flex items-center space-x-3">

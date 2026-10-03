@@ -98,119 +98,66 @@ const AdminDashboard = () => {
     }
   };
 
-  // Derive counts with fallback to ensure full display matching the design
+  // Derive counts dynamically from backend response
   const kpis = stats?.kpis || {};
-  const registeredCount = kpis.totalStudents || 25;
-  const activeCount = kpis.activeStudents || 14;
-  const assessmentsCount = kpis.totalAssessments || 3;
-  const publishedCount = kpis.publishedAssessments || 12;
-  const questionsCount = kpis.totalQuestions || 85;
-  const topicsCount = kpis.totalTopics || 10;
-  const averageReadiness = kpis.averageReadiness || 5;
+  const registeredCount = kpis.totalStudents || 0;
+  const activeCount = kpis.activeStudents || 0;
+  const assessmentsCount = kpis.totalAssessments || 0;
+  const publishedCount = kpis.publishedAssessments || 0;
+  const questionsCount = kpis.totalQuestions || 0;
+  const topicsCount = kpis.totalTopics || 0;
+  const averageReadiness = kpis.averageReadiness || 0;
 
-  // 1. Readiness Score Distribution Data (Changes slightly based on timeRange)
-  const distributionDataMap = {
-    'This Week': [
-      { range: '0-20', percentage: 15, students: 4 },
-      { range: '21-40', percentage: 28, students: 7 },
-      { range: '41-60', percentage: 42, students: 11 },
-      { range: '61-80', percentage: 20, students: 5 },
-      { range: '81-100', percentage: 28, students: 7 },
-    ],
-    'This Month': [
-      { range: '0-20', percentage: 18, students: 5 },
-      { range: '21-40', percentage: 32, students: 8 },
-      { range: '41-60', percentage: 38, students: 10 },
-      { range: '61-80', percentage: 24, students: 6 },
-      { range: '81-100', percentage: 25, students: 6 },
-    ],
-    'All Time': [
-      { range: '0-20', percentage: 12, students: 3 },
-      { range: '21-40', percentage: 25, students: 6 },
-      { range: '41-60', percentage: 45, students: 12 },
-      { range: '61-80', percentage: 22, students: 5 },
-      { range: '81-100', percentage: 30, students: 8 },
-    ],
-  };
+  // 1. Readiness Score Distribution Data (Calculated dynamically from DB)
+  const dist = stats?.distribution || {};
+  const totalProfiles = (dist.beginner || 0) + (dist.developing || 0) + (dist.good || 0) + (dist.placementReady || 0);
+  const currentDistributionData = [
+    { range: '0-39', percentage: totalProfiles > 0 ? Math.round((dist.beginner / totalProfiles) * 100) : 0, students: dist.beginner || 0 },
+    { range: '40-64', percentage: totalProfiles > 0 ? Math.round((dist.developing / totalProfiles) * 100) : 0, students: dist.developing || 0 },
+    { range: '65-84', percentage: totalProfiles > 0 ? Math.round((dist.good / totalProfiles) * 100) : 0, students: dist.good || 0 },
+    { range: '85-100', percentage: totalProfiles > 0 ? Math.round((dist.placementReady / totalProfiles) * 100) : 0, students: dist.placementReady || 0 },
+  ];
 
-  const currentDistributionData = distributionDataMap[timeRange] || distributionDataMap['This Week'];
-
-  // 2. Domain Performance Overview Data (Grouped Bar Chart)
+  // 2. Domain Performance Overview Data
+  const dp = stats?.domainPerformance || {};
   const domainData = [
-    { name: 'DSA', current: 72, lastWeek: 65 },
-    { name: 'Aptitude', current: 58, lastWeek: 52 },
-    { name: 'CS Core', current: 46, lastWeek: 40 },
-    { name: 'Interview Prep', current: 38, lastWeek: 32 },
+    { name: 'DSA', current: dp.dsa?.accuracy || 0, lastWeek: 0 },
+    { name: 'Aptitude', current: dp.aptitude?.accuracy || 0, lastWeek: 0 },
+    { name: 'CS Core', current: dp.csCore?.accuracy || 0, lastWeek: 0 },
   ];
 
-  // 3. Student Status / Readiness Tiers Donut Chart Data
+  // 3. Student Readiness Tiers Donut Data
   const readinessTierData = [
-    { name: 'Ready (81-100)', value: 8, percentage: '32%', color: '#10b981' }, // emerald
-    { name: 'Developing (61-80)', value: 7, percentage: '28%', color: '#06b6d4' }, // cyan
-    { name: 'Learning (41-60)', value: 6, percentage: '24%', color: '#f59e0b' }, // amber
-    { name: 'Beginner (0-40)', value: 4, percentage: '16%', color: '#f43f5e' }, // rose
+    { name: 'Ready (85-100)', value: dist.placementReady || 0, color: '#10b981' },
+    { name: 'Good (65-84)', value: dist.good || 0, color: '#06b6d4' },
+    { name: 'Developing (40-64)', value: dist.developing || 0, color: '#f59e0b' },
+    { name: 'Beginner (0-39)', value: dist.beginner || 0, color: '#f43f5e' },
   ];
 
-  // 4. Curriculum Completion
+  // 4. Content Volume
+  const qc = stats?.questionCounts || {};
   const curriculumProgress = [
-    { name: 'DSA', progress: 92, color: 'bg-indigo-600' },
-    { name: 'Aptitude', progress: 78, color: 'bg-purple-600' },
-    { name: 'CS Core', progress: 65, color: 'bg-violet-500' },
-    { name: 'Interview Prep', progress: 48, color: 'bg-indigo-400' },
+    { name: 'DSA Questions', progress: qc.dsa || 0, color: 'bg-indigo-600' },
+    { name: 'Aptitude Questions', progress: qc.aptitude || 0, color: 'bg-purple-600' },
+    { name: 'CS Core Questions', progress: qc.csCore || 0, color: 'bg-violet-500' },
   ];
 
-  // 5. Top Performing Topics
-  const topTopics = [
-    { name: 'Arrays & Hashing', score: 92 },
-    { name: 'Time & Space Complexity', score: 86 },
-    { name: 'Number Systems', score: 78 },
-    { name: 'Logical Reasoning', score: 72 },
-    { name: 'DBMS Basics', score: 68 },
-  ];
+  // 5. Topics / Weaknesses Aggregate
+  const topTopics = Array.isArray(stats?.weakTopics)
+    ? stats.weakTopics.slice(0, 5).map(t => ({ name: t.topic || 'Topic', score: t.totalAttempts || 0 }))
+    : [];
 
   // 6. Recent Activity Items
-  const recentActivities = [
-    {
-      id: 1,
-      dotColor: 'bg-emerald-500',
-      title: 'New student registered',
-      desc: 'Riya Sharma',
-      time: '2 hours ago',
-      path: '/admin/students'
-    },
-    {
-      id: 2,
-      dotColor: 'bg-indigo-500',
-      title: 'Assessment completed',
-      desc: 'DSA Mock Test • 14 students',
-      time: '4 hours ago',
-      path: '/admin/assessments'
-    },
-    {
-      id: 3,
-      dotColor: 'bg-purple-500',
-      title: 'New test published',
-      desc: 'Aptitude Practice Test',
-      time: '6 hours ago',
-      path: '/admin/assessments'
-    },
-    {
-      id: 4,
-      dotColor: 'bg-amber-500',
-      title: 'Company added',
-      desc: 'TCS',
-      time: '1 day ago',
-      path: '/admin/companies'
-    },
-    {
-      id: 5,
-      dotColor: 'bg-slate-400',
-      title: 'Curriculum updated',
-      desc: 'DSA - Advanced Topics',
-      time: '1 day ago',
-      path: '/admin/topics'
-    },
-  ];
+  const recentActivities = Array.isArray(stats?.recentActivities)
+    ? stats.recentActivities.map((act, i) => ({
+        id: i + 1,
+        dotColor: 'bg-indigo-500',
+        title: act.type || 'Activity',
+        desc: act.detail || '',
+        time: act.time || 'Recently',
+        path: '/admin/students'
+      }))
+    : [];
 
   // 7. Placement Pipeline Steps
   const pipelineSteps = [

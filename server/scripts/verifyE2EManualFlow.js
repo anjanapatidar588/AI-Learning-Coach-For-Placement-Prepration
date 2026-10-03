@@ -168,21 +168,20 @@ const runE2EVerification = async () => {
     });
     createdUserIds.push(adminUser._id);
 
-    // Question distribution validation check (sum !== total)
+    // Empty subjects/topics validation check
     const invalidBlueprintPayload = {
-      title: 'Invalid Distribution Assessment',
-      subject: 'dsa',
-      difficulty: 'Medium',
+      title: 'Invalid Assessment',
       questionCount: 5,
-      topicDistribution: [{ topic: 'Arrays', count: 3 }], // sum = 3 !== 5
+      subjects: [],
+      selectedTopics: [],
       durationMinutes: 30
     };
     ({ req, res } = createMockReqRes({}, invalidBlueprintPayload));
     await runWithAuth(createAdminAssessmentBlueprint, req, res, adminUser);
     if (res.statusCode !== 400) {
-      throw new Error(`Expected 400 for topic distribution mismatch, got ${res.statusCode}`);
+      throw new Error(`Expected 400 for empty subjects/topics selection, got ${res.statusCode}`);
     }
-    console.log('[PASS] 5. Admin question distribution mismatch correctly rejected with HTTP 400.');
+    console.log('[PASS] 5. Admin empty subjects/topics selection correctly rejected with HTTP 400.');
 
     // Valid blueprint creation (sum === total)
     const validBlueprintPayload = {

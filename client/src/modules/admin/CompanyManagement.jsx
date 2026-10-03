@@ -42,71 +42,6 @@ const CompanyManagement = () => {
     ]
   });
 
-  const defaultStarterCompanies = [
-    {
-      id: 'comp-1',
-      name: 'Tata Consultancy Services (TCS)',
-      description: 'Global IT consulting leader with TCS Digital & Prime hiring tracks.',
-      cutoffBenchmark: 70,
-      taggedQuestionsCount: 18,
-      syllabus: ['DSA', 'Quantitative Aptitude', 'Verbal Ability', 'DBMS'],
-      hiringRounds: [
-        { roundName: 'NQT Aptitude & Coding', roundType: 'Online Test', description: 'Cognitive and programming logic' },
-        { roundName: 'Technical Interview', roundType: 'Technical', description: 'Core CS concepts and coding' },
-        { roundName: 'HR Discussion', roundType: 'HR', description: 'Communication and culture fit' }
-      ]
-    },
-    {
-      id: 'comp-2',
-      name: 'Amazon',
-      description: 'Global e-commerce and cloud computing giant seeking SDE-1 software engineers.',
-      cutoffBenchmark: 85,
-      taggedQuestionsCount: 26,
-      syllabus: ['Dynamic Programming', 'Trees & Graphs', 'System Design', 'Leadership Principles'],
-      hiringRounds: [
-        { roundName: 'Online Coding Assessment (OA)', roundType: 'Coding', description: '2 Medium-Hard LeetCode problems + Work Simulation' },
-        { roundName: 'Technical Bar Raiser', roundType: 'Live Coding', description: 'Complex algorithms and data structures' },
-        { roundName: 'System Architecture & LP', roundType: 'System Design', description: 'Scalability and Amazon Leadership Principles' }
-      ]
-    },
-    {
-      id: 'comp-3',
-      name: 'Infosys',
-      description: 'Multinational digital services enterprise with Specialist Programmer & DSE roles.',
-      cutoffBenchmark: 72,
-      taggedQuestionsCount: 14,
-      syllabus: ['Object Oriented Programming', 'SQL Queries', 'Aptitude', 'Data Structures'],
-      hiringRounds: [
-        { roundName: 'InfyTQ Certification / Test', roundType: 'MCQ & Code', description: 'Java/Python programming and database questions' },
-        { roundName: 'Technical Interview', roundType: 'Technical', description: 'Project demonstration and CS fundamentals' }
-      ]
-    },
-    {
-      id: 'comp-4',
-      name: 'Google',
-      description: 'Alphabet flagship engineering team hiring software engineers for high-scale systems.',
-      cutoffBenchmark: 90,
-      taggedQuestionsCount: 32,
-      syllabus: ['Advanced Graphs', 'Dynamic Programming', 'Concurrency', 'Operating Systems'],
-      hiringRounds: [
-        { roundName: 'Phone Screen', roundType: 'Live Coding', description: '45-minute live algorithmic coding with a Google engineer' },
-        { roundName: 'Onsite Loop (4 Rounds)', roundType: 'Technical', description: 'Algorithmic depth, system design, and Googliness' }
-      ]
-    },
-    {
-      id: 'comp-5',
-      name: 'Microsoft',
-      description: 'Global technology company building enterprise software, Azure cloud, and developer platforms.',
-      cutoffBenchmark: 82,
-      taggedQuestionsCount: 22,
-      syllabus: ['Trees', 'Linked Lists', 'OOP Design', 'System Architecture'],
-      hiringRounds: [
-        { roundName: 'Codility OA', roundType: 'Coding', description: '3 coding problems in 90 minutes' },
-        { roundName: 'Technical Virtual Onsite', roundType: 'Live Coding', description: 'Data structures, design patterns, and debugging' }
-      ]
-    }
-  ];
-
   useEffect(() => {
     fetchCompanies();
   }, []);
@@ -115,14 +50,14 @@ const CompanyManagement = () => {
     try {
       setLoading(true);
       const res = await API.get('/admin/companies');
-      if (res.data?.success && Array.isArray(res.data.data) && res.data.data.length > 0) {
+      if (res.data?.success && Array.isArray(res.data.data)) {
         setCompanies(res.data.data);
       } else {
-        setCompanies(defaultStarterCompanies);
+        setCompanies([]);
       }
     } catch (err) {
-      // Fallback to starter companies so admin sees rich UI
-      setCompanies(defaultStarterCompanies);
+      console.error('Failed to fetch companies:', err);
+      setCompanies([]);
     } finally {
       setLoading(false);
     }

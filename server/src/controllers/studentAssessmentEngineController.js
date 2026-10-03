@@ -25,6 +25,7 @@ export const getPublishedAssessments = async (req, res) => {
       assessmentId: a._id.toString(),
       title: a.title,
       description: a.description,
+      assessmentPurpose: a.assessmentPurpose || 'PRACTICE',
       version: a.version,
       durationMinutes: a.durationMinutes,
       totalMarks: a.totalMarks,
@@ -36,6 +37,77 @@ export const getPublishedAssessments = async (req, res) => {
     }));
 
     res.json({ success: true, data: safeList });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * GET /api/v1/student/assessment/baseline
+ * Retrieves active published INITIAL_BASELINE assessment.
+ */
+export const getPublishedInitialBaselineAssessment = async (req, res) => {
+  try {
+    const assessment = await PublishedAssessment.findOne({
+      status: 'PUBLISHED',
+      assessmentPurpose: 'INITIAL_BASELINE'
+    })
+      .sort({ publishedAt: -1 })
+      .populate({
+        path: 'questions.questionId',
+        populate: { path: 'topicId', select: 'title category subject' }
+      })
+      .lean();
+
+    if (!assessment) {
+      return res.json({
+        success: true,
+        data: null,
+        message: 'No published initial baseline assessment available'
+      });
+    }
+
+    const safeQuestions = (assessment.questions || []).map(qItem => {
+      const q = qItem.questionId;
+      if (!q) return null;
+
+      let options = null;
+      if (Array.isArray(q.mcqOptions) && q.mcqOptions.length > 0) {
+        options = q.mcqOptions.map(opt => ({
+          optionId: opt.optionId || opt.text || opt.optionText,
+          text: opt.text || opt.optionText || opt.optionId
+        }));
+      }
+
+      return {
+        questionId: q._id.toString(),
+        title: q.title,
+        problemStatement: q.problemStatement || q.description || q.title,
+        category: q.category || 'dsa',
+        topic: q.topicId?.title || 'General',
+        difficulty: q.difficulty || 'Medium',
+        type: q.type || (options ? 'mcq' : 'coding'),
+        marks: qItem.marks || assessment.marksPerQuestion || 1,
+        options
+      };
+    }).filter(Boolean);
+
+    res.json({
+      success: true,
+      data: {
+        assessmentId: assessment._id.toString(),
+        title: assessment.title,
+        description: assessment.description,
+        assessmentPurpose: 'INITIAL_BASELINE',
+        version: assessment.version,
+        durationMinutes: assessment.durationMinutes,
+        totalMarks: assessment.totalMarks,
+        questionCount: safeQuestions.length,
+        negativeMarking: assessment.negativeMarking,
+        negativeMarks: assessment.negativeMarks,
+        questions: safeQuestions
+      }
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -91,6 +163,7 @@ export const getPublishedAssessmentById = async (req, res) => {
         assessmentId: assessment._id.toString(),
         title: assessment.title,
         description: assessment.description,
+        assessmentPurpose: assessment.assessmentPurpose || 'PRACTICE',
         version: assessment.version,
         durationMinutes: assessment.durationMinutes,
         totalMarks: assessment.totalMarks,
@@ -116,6 +189,21 @@ export const startStudentAssessment = async (req, res) => {
     const assessment = await PublishedAssessment.findOne({ _id: assessmentId, status: 'PUBLISHED' });
     if (!assessment) {
       return res.status(404).json({ success: false, message: 'Published Assessment not found' });
+    }
+
+    if (assessment.assessmentPurpose === 'INITIAL_BASELINE') {
+      const profile = await LearnerProfile.findOne({ userId });
+      const completedAttempt = await AssessmentAttempt.findOne({
+        studentId: userId,
+        status: 'COMPLETED'
+      });
+      if ((profile && profile.baselineAssessmentCompleted) || completedAttempt) {
+        return res.status(400).json({
+          success: false,
+          message: 'Initial baseline assessment has already been completed.',
+          alreadyCompleted: true
+        });
+      }
     }
 
     let attempt = await AssessmentAttempt.findOne({
@@ -408,9 +496,11 @@ export const submitStudentAssessment = async (req, res) => {
       profile = await LearnerProfile.create({ userId });
     }
 
-    profile.baselineAssessmentCompleted = true;
-    profile.baselineScore = overallPercentage;
-    profile.baselineCompletedAt = now;
+    if (assessment.assessmentPurpose === 'INITIAL_BASELINE' || !profile.baselineAssessmentCompleted) {
+      profile.baselineAssessmentCompleted = true;
+      profile.baselineScore = overallPercentage;
+      profile.baselineCompletedAt = now;
+    }
     profile.totalProblemsSolved += correctCount;
 
     // Authoritative skill level determined from assessment score (Beginner, Intermediate, Advanced)
